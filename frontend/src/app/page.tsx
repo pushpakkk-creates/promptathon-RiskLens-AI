@@ -33,6 +33,7 @@ export default function Home() {
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetchSummary();
@@ -57,37 +58,45 @@ export default function Home() {
     }
   };
 
-  const uploadContract = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
+const uploadContract = async (
+  event: React.ChangeEvent<HTMLInputElement>
+) => {
+  const file = event.target.files?.[0];
 
-    if (!file) return;
+  if (!file) return;
+
+  try {
+    setUploading(true);
+    setError("");
 
     const formData = new FormData();
     formData.append("file", file);
 
-    try {
-      setUploading(true);
+    const response = await api.post(
+      "/contracts/upload",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
 
-      const response = await api.post(
-        "/contracts/upload",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
+    router.push(`/contracts/${response.data.contract_id}`);
+  } catch (error: any) {
+    console.error(error);
+
+    if (error.response?.data?.detail) {
+      setError(error.response.data.detail);
+    } else {
+      setError(
+        "Upload failed. Please upload a valid procurement contract PDF."
       );
-
-      router.push(`/contracts/${response.data.contract_id}`);
-    } catch (error) {
-      console.error(error);
-      alert("Upload failed.");
-    } finally {
-      setUploading(false);
     }
-  };
+  } finally {
+    setUploading(false);
+  }
+};
 
   const getRiskBadge = (risk: string) => {
     if (risk === "CRITICAL PROCUREMENT RISK") {
@@ -105,10 +114,26 @@ export default function Home() {
     return "bg-green-900 text-green-400";
   };
 
+  const getStatusBadge = (status: string) => {
+    if (status === "APPROVED") {
+      return "bg-green-950 text-green-400";
+    }
+
+    if (status === "REJECTED") {
+      return "bg-red-950 text-red-400";
+    }
+
+    if (status === "ESCALATED") {
+      return "bg-orange-950 text-orange-400";
+    }
+
+    return "bg-yellow-900 text-yellow-400";
+  };
+
   if (!summary) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center text-xl">
-        Loading ProcureGuard AI...
+        Loading RiskLens AI...
       </div>
     );
   }
@@ -119,11 +144,11 @@ export default function Home() {
       <div className="flex justify-between items-center mb-10">
         <div>
           <h1 className="text-5xl font-bold tracking-tight">
-            ProcureGuard AI
+            RiskLens AI
           </h1>
 
           <p className="text-gray-400 mt-3 text-lg">
-            Procurement Contract Intelligence Copilot
+            AI-Powered Procurement Risk Intelligence Platform
           </p>
         </div>
 
@@ -138,6 +163,19 @@ export default function Home() {
           />
         </label>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-8 bg-red-900 border border-red-700 text-red-200 px-6 py-4 rounded-2xl max-w-3xl">
+          <p className="font-bold text-lg">
+            Invalid Upload
+          </p>
+
+          <p className="mt-2 text-sm">
+            {error}
+          </p>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-10">
@@ -183,6 +221,7 @@ export default function Home() {
                 <th className="pb-4">Risk Score</th>
                 <th className="pb-4">Risk Band</th>
                 <th className="pb-4">Recommendation</th>
+                <th className="pb-4">Status</th>
               </tr>
             </thead>
 
@@ -195,7 +234,9 @@ export default function Home() {
                   }
                   className="border-b border-zinc-800 hover:bg-zinc-800 transition cursor-pointer"
                 >
-                  <td className="py-4">{contract.filename}</td>
+                  <td className="py-4">
+                    {contract.filename}
+                  </td>
 
                   <td className="py-4">
                     {contract.document_type}
@@ -221,6 +262,16 @@ export default function Home() {
 
                   <td className="py-4">
                     {contract.recommendation}
+                  </td>
+
+                  <td className="py-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusBadge(
+                        contract.status
+                      )}`}
+                    >
+                      {contract.status}
+                    </span>
                   </td>
                 </tr>
               ))}

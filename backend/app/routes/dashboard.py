@@ -1,11 +1,16 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.contract import Contract
 
 router = APIRouter()
+
+
+class StatusUpdate(BaseModel):
+    status: str
 
 
 @router.get("/summary")
@@ -75,9 +80,7 @@ def get_contract_detail(contract_id: int, db: Session = Depends(get_db)):
     ).first()
 
     if not contract:
-        return {
-            "error": "Contract not found"
-        }
+        return {"error": "Contract not found"}
 
     return {
         "id": contract.id,
@@ -90,18 +93,37 @@ def get_contract_detail(contract_id: int, db: Session = Depends(get_db)):
         "emd_amount": contract.emd_amount,
         "security_deposit_percent": contract.security_deposit_percent,
         "retention_percent": contract.retention_percent,
-
         "overall_risk_score": contract.overall_risk_score,
         "risk_band": contract.risk_band,
         "recommendation": contract.recommendation,
         "status": contract.status,
-
         "procurement_kpis": contract.procurement_kpis,
         "risk_breakdown": contract.risk_breakdown,
         "missing_clauses": contract.missing_clauses,
         "risk_reasons": contract.risk_reasons,
-
         "executive_summary": contract.executive_summary,
-
         "created_at": contract.created_at
+    }
+
+
+@router.patch("/contracts/{contract_id}/status")
+def update_contract_status(
+    contract_id: int,
+    payload: StatusUpdate,
+    db: Session = Depends(get_db)
+):
+    contract = db.query(Contract).filter(
+        Contract.id == contract_id
+    ).first()
+
+    if not contract:
+        return {"error": "Contract not found"}
+
+    contract.status = payload.status
+    db.commit()
+    db.refresh(contract)
+
+    return {
+        "message": "Status updated successfully",
+        "status": contract.status
     }

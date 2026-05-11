@@ -36,4 +36,4 @@ app.include_router(
 
 @app.get("/")
 def health_check():
-    return {"message": "ProcureGuard AI backend running"}
+    return {"message": "RiskLens-AI backend running"}
