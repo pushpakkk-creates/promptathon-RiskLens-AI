@@ -1,372 +1,408 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { Badge, StatCard } from "@/components/DashboardPrimitives";
 import api from "@/lib/api";
+import { formatLabel, riskTone, workflowTone } from "@/lib/risk";
+import type { ClauseCitation, Contract, RiskBreakdown } from "@/lib/types";
+import { AxiosError } from "axios";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  FileSearch,
+  Gauge,
+  MailCheck,
+  RotateCcw,
+  Send,
+  ShieldAlert,
+  XCircle,
+} from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-type ContractDetail = {
-  id: number;
-  filename: string;
-  document_type: string;
-  vendor_name: string;
-  contract_value: string;
-  currency: string;
-  contract_duration_months: number;
-  emd_amount: string;
-  security_deposit_percent: number;
-  retention_percent: number;
-
-  overall_risk_score: number;
-  risk_band: string;
-  recommendation: string;
-  status: string;
-
-  procurement_kpis: any;
-  risk_breakdown: any;
-  missing_clauses: string[];
-  risk_reasons: string[];
-
-  executive_summary: string;
+type Tab = "overview" | "clauses" | "document" | "workflow";
+type VendorMail = {
+  recipient: string;
+  subject: string;
+  body: string;
+  delivery_status: string;
+  sent?: boolean;
+  delivery_reason?: string;
 };
 
-export default function ContractPage() {
-  const params = useParams();
-  const contractId = params.id;
+const tabs: { id: Tab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "clauses", label: "Risk Insights" },
+  { id: "document", label: "Document KPIs" },
+  { id: "workflow", label: "Workflow" },
+];
 
-  const [contract, setContract] = useState<ContractDetail | null>(null);
-  const [updating, setUpdating] = useState(false);
+export default function ContractPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const contractId = params.id;
+  const [contract, setContract] = useState<Contract | null>(null);
+  const [active, setActive] = useState<Tab>("overview");
+  const [loading, setLoading] = useState(false);
+  const [role] = useState<"analyst" | "manager">(() => {
+    if (typeof window === "undefined") return "analyst";
+    return localStorage.getItem("role") === "manager" ? "manager" : "analyst";
+  });
+  const [mail, setMail] = useState<VendorMail | null>(null);
+  const [error, setError] = useState("");
+
+  const fetchContract = useCallback(async () => {
+    const response = await api.get<Contract>(`/dashboard/contracts/${contractId}`);
+    setContract(response.data);
+  }, [contractId]);
 
   useEffect(() => {
-    fetchContract();
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchContract().catch((fetchError: unknown) => {
+      console.error(fetchError);
+      setError("Unable to load contract intelligence.");
+    });
+  }, [fetchContract]);
 
-  const fetchContract = async () => {
+  const riskData = useMemo(() => {
+    const risk: RiskBreakdown = contract?.risk_breakdown || {};
+    return [
+      { name: "Commercial", value: risk.commercial || 0 },
+      { name: "Operational", value: risk.operational || 0 },
+      { name: "Legal", value: risk.legal || 0 },
+      { name: "Vendor", value: risk.vendor || 0 },
+    ];
+  }, [contract?.risk_breakdown]);
+
+  const updateWorkflow = async (action: string) => {
     try {
-      const response = await api.get(`/dashboard/contracts/${contractId}`);
-      setContract(response.data);
-    } catch (error) {
-      console.error(error);
+      setLoading(true);
+      setError("");
+      await api.patch(`/contracts/${contractId}/workflow`, {
+        action,
+        notes: `${formatLabel(action)} by ${role}`,
+      });
+      await fetchContract();
+    } catch (workflowError: unknown) {
+      const axiosError = workflowError as AxiosError<{ detail?: string }>;
+      setError(axiosError.response?.data?.detail || "Workflow update failed.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const updateStatus = async (status: string) => {
+  const composeMail = async (decision: "APPROVE" | "NEGOTIATE" | "REJECT", send = false) => {
     try {
-      setUpdating(true);
-
-      await api.patch(`/dashboard/contracts/${contractId}/status`, {
-        status,
+      setLoading(true);
+      setError("");
+      const response = await api.post<VendorMail>(`/contracts/${contractId}/vendor-mail`, {
+        decision,
+        recipient_email: "vendor@example.com",
+        notes: contract?.manager_notes || contract?.analyst_notes,
+        send,
       });
-
-      fetchContract();
-    } catch (error) {
-      console.error(error);
+      setMail(response.data);
+      setActive("workflow");
+    } catch (mailError: unknown) {
+      const axiosError = mailError as AxiosError<{ detail?: string }>;
+      setError(axiosError.response?.data?.detail || "Mail draft failed.");
     } finally {
-      setUpdating(false);
+      setLoading(false);
     }
   };
 
   if (!contract) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center text-xl">
-        Loading RiskLens AI...
-      </div>
+      <main className="grid min-h-screen place-items-center bg-[var(--background)] text-sm font-black text-[var(--ink-blue)]">
+        {error || "Loading contract intelligence"}
+      </main>
     );
   }
 
   const kpis = contract.procurement_kpis || {};
-  const risk = contract.risk_breakdown || {};
-
-  const getRiskColor = (band: string) => {
-    if (band.includes("CRITICAL")) return "text-red-400";
-    if (band.includes("HIGH")) return "text-orange-400";
-    if (band.includes("MODERATE")) return "text-yellow-400";
-    return "text-green-400";
-  };
-
-  const getStatusColor = (status: string) => {
-    if (status === "APPROVED") return "bg-green-950 text-green-400";
-    if (status === "REJECTED") return "bg-red-950 text-red-400";
-    if (status === "ESCALATED") return "bg-orange-950 text-orange-400";
-    return "bg-yellow-900 text-yellow-400";
-  };
+  const missingClauses = contract.missing_clauses || [];
+  const riskReasons = contract.risk_reasons || [];
+  const citations = contract.clause_citations || [];
 
   return (
-    <main className="min-h-screen bg-black text-white p-8">
-      {/* HERO */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 mb-8">
-        <div className="flex flex-col lg:flex-row lg:justify-between gap-8">
+    <main className="min-h-screen bg-[var(--background)] px-5 py-5 text-slate-950 sm:px-8 lg:px-10">
+      <button
+        className="mb-5 inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-white px-4 py-2 text-sm font-black text-[var(--ink-blue)]"
+        onClick={() => router.push(role === "manager" ? "/manager/dashboard" : "/analyst/dashboard")}
+        type="button"
+      >
+        <ArrowLeft size={16} />
+        Back to dashboard
+      </button>
+
+      <section className="rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
+        <div className="grid gap-8 xl:grid-cols-[1fr_330px]">
           <div>
-            <h1 className="text-5xl font-bold tracking-tight">
-              RiskLens AI
-            </h1>
-
-            <p className="text-gray-400 mt-4 text-lg break-words">
-              {contract.filename}
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--carrier-blue)]">Contract RL-{contract.id}</p>
+            <h1 className="mt-2 text-4xl font-black text-[var(--ink-blue)]">{contract.filename}</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+              {contract.executive_summary || "AI executive summary will appear after analysis."}
             </p>
-
-            <div className="flex flex-wrap gap-3 mt-5">
-  <Badge value={contract.document_type} />
-
-  <span className="px-5 py-2 rounded-full bg-blue-950 text-blue-300 font-bold text-sm border border-blue-800">
-    {contract.vendor_name || "Vendor Unspecified"}
-  </span>
-
-  <Badge
-    value={contract.status}
-    customClass={getStatusColor(contract.status)}
-  />
-</div>
-          </div>
-
-          <div className="lg:text-right">
-            <h2 className={`text-3xl font-bold ${getRiskColor(contract.risk_band)}`}>
-              {contract.risk_band}
-            </h2>
-
-            <p className="text-gray-400 mt-3">
-              Risk Score
-            </p>
-
-            <p className="text-5xl font-bold mt-1">
-              {contract.overall_risk_score}
-            </p>
-
-            <p className="mt-4 text-lg">
-              Recommendation:
-              <span className="text-blue-400 font-bold ml-2">
-                {contract.recommendation}
-              </span>
-            </p>
-          </div>
-        </div>
-
-        {/* ACTIONS */}
-        <div className="mt-8 flex flex-wrap gap-4">
-          <ActionButton
-            label="Approve"
-            color="bg-green-600 hover:bg-green-700"
-            onClick={() => updateStatus("APPROVED")}
-            disabled={updating}
-          />
-
-          <ActionButton
-            label="Review"
-            color="bg-yellow-600 hover:bg-yellow-700"
-            onClick={() => updateStatus("REVIEW")}
-            disabled={updating}
-          />
-
-          <ActionButton
-            label="Escalate"
-            color="bg-orange-600 hover:bg-orange-700"
-            onClick={() => updateStatus("ESCALATED")}
-            disabled={updating}
-          />
-
-          <ActionButton
-            label="Reject"
-            color="bg-red-600 hover:bg-red-700"
-            onClick={() => updateStatus("REJECTED")}
-            disabled={updating}
-          />
-        </div>
-      </div>
-
-      {/* KPI GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5 mb-8">
-        <MetricCard title="Contract Value" value={`${contract.currency} ${contract.contract_value || "N/A"}`} />
-        <MetricCard title="Duration" value={`${contract.contract_duration_months || 0} months`} />
-        <MetricCard title="EMD" value={contract.emd_amount || "N/A"} />
-        <MetricCard title="Security Deposit" value={`${contract.security_deposit_percent || 0}%`} />
-        <MetricCard title="Retention" value={`${contract.retention_percent || 0}%`} />
-        <MetricCard title="Payment Cycle" value={`${kpis.payment_cycle_days || 0} days`} />
-        <MetricCard title="Advance Payment" value={kpis.advance_payment ? "Yes" : "No"} />
-        <MetricCard title="Warranty" value={`${kpis.warranty_months || 0} months`} />
-      </div>
-
-      {/* RISK BREAKDOWN */}
-      <Section title="Risk Breakdown">
-        <RiskBar title="Commercial" value={risk.commercial || 0} />
-        <RiskBar title="Operational" value={risk.operational || 0} />
-        <RiskBar title="Legal" value={risk.legal || 0} />
-        <RiskBar title="Vendor" value={risk.vendor || 0} />
-      </Section>
-
-      {/* EXEC SUMMARY */}
-      <Section title="AI Executive Assessment">
-        <p className="text-gray-300 leading-8 whitespace-pre-line">
-          {contract.executive_summary}
-        </p>
-      </Section>
-
-      {/* PROCUREMENT DETAILS */}
-      <Section title="Procurement Intelligence">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <InfoItem title="Payment Terms" value={kpis.payment_terms || "Not specified"} />
-          <InfoItem title="Delivery Timeline" value={`${kpis.delivery_timeline_days || 0} days`} />
-          <InfoItem title="SLA Response Time" value={`${kpis.sla_response_time_hours || 0} hours`} />
-          <InfoItem title="Uptime Commitment" value={`${kpis.sla_uptime_percent || 0}%`} />
-          <InfoItem title="Maintenance Frequency" value={kpis.maintenance_frequency || "Not specified"} />
-          <InfoItem title="Minimum Turnover" value={kpis.minimum_turnover_required || "Not specified"} />
-          <InfoItem title="Experience Required" value={`${kpis.minimum_experience_years || 0} years`} />
-          <InfoItem title="Certifications" value={kpis.certifications_required || "Not specified"} />
-        </div>
-
-        <div className="mt-6">
-          <InfoItem
-            title="Scope Summary"
-            value={kpis.scope_summary || "No scope summary available"}
-          />
-        </div>
-      </Section>
-
-      {/* MISSING CLAUSES */}
-      <Section title="Missing Clauses">
-        <div className="flex flex-wrap gap-3">
-          {contract.missing_clauses.map((clause, index) => (
-            <span
-              key={index}
-              className="bg-red-950 text-red-300 px-4 py-2 rounded-full text-sm"
-            >
-              {clause}
-            </span>
-          ))}
-        </div>
-      </Section>
-
-      {/* RISK INSIGHTS */}
-      <Section title="Risk Insights">
-        <div className="space-y-4">
-          {contract.risk_reasons.map((reason, index) => (
-            <div
-              key={index}
-              className="bg-zinc-800 rounded-2xl p-4 border border-zinc-700"
-            >
-              ⚠ {reason}
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Badge value={contract.data_source || "supabase"} />
+              <Badge value={contract.vendor_name || "Vendor unspecified"} />
+              <Badge value={contract.document_type || "Other"} />
+              <Badge tone={riskTone(contract.risk_band)} value={contract.risk_band} />
+              <Badge tone={workflowTone(contract.workflow_status)} value={contract.workflow_status} />
             </div>
-          ))}
+          </div>
+
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-5">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Overall risk score</p>
+            <p className="mt-3 text-6xl font-black text-[var(--ink-blue)]">{contract.overall_risk_score || 0}</p>
+            <p className="mt-2 text-sm font-bold text-slate-600">Recommendation: {formatLabel(contract.recommendation)}</p>
+          </div>
         </div>
-      </Section>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          {role === "analyst" ? (
+            <>
+              <ActionButton disabled={loading} icon={<Send size={17} />} label="Submit to manager" onClick={() => updateWorkflow("SUBMIT_FOR_REVIEW")} tone="primary" />
+              <ActionButton disabled={loading} icon={<ShieldAlert size={17} />} label="Escalate" onClick={() => updateWorkflow("ESCALATE")} tone="warning" />
+            </>
+          ) : (
+            <>
+              <ActionButton disabled={loading} icon={<CheckCircle2 size={17} />} label="Approve" onClick={() => updateWorkflow("APPROVE")} tone="success" />
+              <ActionButton disabled={loading} icon={<RotateCcw size={17} />} label="Send back" onClick={() => updateWorkflow("SEND_BACK")} tone="warning" />
+              <ActionButton disabled={loading} icon={<XCircle size={17} />} label="Reject" onClick={() => updateWorkflow("REJECT")} tone="danger" />
+            </>
+          )}
+        </div>
+        {error ? <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p> : null}
+      </section>
+
+      <div className="mt-6 flex gap-2 overflow-x-auto border-b border-blue-100">
+        {tabs.map((tab) => (
+          <button
+            className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-black transition ${
+              active === tab.id ? "border-[var(--carrier-blue)] text-[var(--ink-blue)]" : "border-transparent text-slate-500"
+            }`}
+            key={tab.id}
+            onClick={() => setActive(tab.id)}
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {active === "overview" ? (
+        <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_0.95fr]">
+          <Panel icon={<Gauge size={20} />} title="Risk breakdown">
+            <div className="h-80 min-h-80 min-w-0">
+              <ResponsiveContainer height="100%" minHeight={320} minWidth={240} width="100%">
+                <BarChart data={riskData}>
+                  <CartesianGrid stroke="#dbeafe" strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tickLine={false} />
+                  <YAxis domain={[0, 100]} tickLine={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#005da8" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Panel>
+
+          <Panel icon={<FileSearch size={20} />} title="Commercial KPIs">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <StatCard label="Value" value={`${contract.currency || "INR"} ${contract.contract_value || "N/A"}`} />
+              <StatCard label="Duration" value={`${contract.contract_duration_months || 0} months`} />
+              <StatCard label="Security deposit" value={`${contract.security_deposit_percent || 0}%`} />
+              <StatCard label="Retention" value={`${contract.retention_percent || 0}%`} />
+            </div>
+          </Panel>
+        </div>
+      ) : null}
+
+      {active === "clauses" ? (
+        <Panel icon={<ShieldAlert size={20} />} title="Clause-level risk marking">
+          <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+            <CitationList citations={citations} />
+            <div className="space-y-5">
+              <InsightList title="Risk reasons" items={riskReasons} empty="No risk reasons were generated." />
+              <InsightList title="Missing clauses" items={missingClauses} empty="No missing clauses detected." danger />
+            </div>
+          </div>
+        </Panel>
+      ) : null}
+
+      {active === "document" ? (
+        <Panel icon={<FileSearch size={20} />} title="Extracted HVAC procurement details">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Info label="Scope" value={kpis.scope_summary || "Not specified"} />
+            <Info label="Payment terms" value={kpis.payment_terms || "Not specified"} />
+            <Info label="Payment cycle" value={`${kpis.payment_cycle_days || 0} days`} />
+            <Info label="Delivery timeline" value={`${kpis.delivery_timeline_days || 0} days`} />
+            <Info label="SLA response" value={`${kpis.sla_response_time_hours || 0} hours`} />
+            <Info label="Uptime SLA" value={`${kpis.sla_uptime_percent || 0}%`} />
+            <Info label="Maintenance" value={kpis.maintenance_frequency || "Not specified"} />
+            <Info label="Warranty" value={`${kpis.warranty_months || 0} months`} />
+            <Info label="Vendor turnover" value={kpis.minimum_turnover_required || "Not specified"} />
+            <Info label="Experience" value={`${kpis.minimum_experience_years || 0} years`} />
+            <Info label="Certifications" value={kpis.certifications_required || "Not specified"} />
+          </div>
+        </Panel>
+      ) : null}
+
+      {active === "workflow" ? (
+        <Panel icon={<MailCheck size={20} />} title="Decision and vendor communication">
+          <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-5">
+              <p className="font-black text-[var(--ink-blue)]">Decision controls</p>
+              <div className="mt-4 grid gap-3">
+                <ActionButton disabled={loading} icon={<MailCheck size={17} />} label="Draft approval" onClick={() => composeMail("APPROVE")} tone="success" />
+                <ActionButton disabled={loading} icon={<RotateCcw size={17} />} label="Draft negotiation" onClick={() => composeMail("NEGOTIATE")} tone="warning" />
+                <ActionButton disabled={loading} icon={<XCircle size={17} />} label="Draft rejection" onClick={() => composeMail("REJECT")} tone="danger" />
+                <ActionButton disabled={loading} icon={<MailCheck size={17} />} label="Send approval email" onClick={() => composeMail("APPROVE", true)} tone="primary" />
+              </div>
+              <p className="mt-4 text-sm leading-6 text-slate-600">
+                SMTP is supported through backend env values. Without SMTP credentials, RiskLens safely returns a draft.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-blue-100 bg-white p-5">
+              {mail ? (
+                <>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Draft ready</p>
+                  <h3 className="mt-2 text-xl font-black text-[var(--ink-blue)]">{mail.subject}</h3>
+                  <p className="mt-2 text-sm font-semibold text-slate-600">To: {mail.recipient}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">
+                    Delivery: {formatLabel(mail.delivery_status)}. {mail.delivery_reason}
+                  </p>
+                  <pre className="mt-5 whitespace-pre-wrap rounded-lg bg-slate-950 p-4 text-sm leading-6 text-white">{mail.body}</pre>
+                </>
+              ) : (
+                <p className="rounded-lg border border-dashed border-blue-200 bg-white p-8 text-center text-sm font-semibold text-slate-500">
+                  Compose an approval, negotiation, or rejection draft after manager decision.
+                </p>
+              )}
+            </div>
+          </div>
+        </Panel>
+      ) : null}
     </main>
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Panel({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 mb-8">
-      <h2 className="text-2xl font-bold mb-6">
-        {title}
-      </h2>
+    <section className="mt-6 rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
+      <div className="mb-5 flex items-center gap-3">
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-blue-50 text-[var(--carrier-blue)]">{icon}</span>
+        <h2 className="text-xl font-black text-[var(--ink-blue)]">{title}</h2>
+      </div>
       {children}
-    </div>
+    </section>
   );
 }
 
-function MetricCard({
-  title,
-  value,
-}: {
-  title: string;
-  value: string;
-}) {
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
-      <h3 className="text-gray-400 text-sm uppercase">
-        {title}
-      </h3>
-
-      <p className="text-2xl font-bold mt-3 break-words">
-        {value}
+function CitationList({ citations }: { citations: ClauseCitation[] }) {
+  if (!citations.length) {
+    return (
+      <p className="rounded-lg border border-dashed border-blue-200 bg-white p-8 text-center text-sm font-semibold text-slate-500">
+        No citation map is available for this contract.
       </p>
-    </div>
-  );
-}
+    );
+  }
 
-function RiskBar({
-  title,
-  value,
-}: {
-  title: string;
-  value: number;
-}) {
   return (
-    <div className="mb-6">
-      <div className="flex justify-between mb-2">
-        <span>{title}</span>
-        <span className="font-bold">{value}</span>
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">Cited evidence</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Each insight is mapped to the closest parsed contract wording. New uploads include stronger page and line
+          references because the source PDF is stored during upload.
+        </p>
       </div>
-
-      <div className="w-full bg-zinc-800 rounded-full h-4 overflow-hidden">
-        <div
-          className="bg-blue-500 h-4 rounded-full transition-all duration-700"
-          style={{ width: `${value}%` }}
-        />
-      </div>
+      {citations.map((citation, index) => (
+        <div className="rounded-lg border border-blue-100 bg-white p-4 shadow-sm" key={`${citation.insight}-${index}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-black text-[var(--ink-blue)]">{citation.insight}</p>
+            <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black text-[var(--carrier-blue)]">
+              {citation.page ? `Page ${citation.page}, lines ${citation.line_start}-${citation.line_end}` : "Absence check"}
+            </span>
+          </div>
+          <blockquote className="mt-3 border-l-4 border-[var(--carrier-blue)] bg-blue-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-800">
+            {citation.snippet}
+          </blockquote>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(citation.matched_terms || []).slice(0, 5).map((term) => (
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600" key={term}>
+                {term}
+              </span>
+            ))}
+            {citation.confidence ? (
+              <span className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-bold text-white">
+                {formatLabel(citation.confidence)}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function InfoItem({
-  title,
-  value,
-}: {
-  title: string;
-  value: string;
-}) {
+function InsightList({ title, items, empty, danger }: { title: string; items: string[]; empty: string; danger?: boolean }) {
   return (
     <div>
-      <p className="text-gray-400 text-sm uppercase mb-2">
-        {title}
-      </p>
-
-      <p className="text-lg break-words">
-        {value}
-      </p>
+      <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">{title}</h3>
+      <div className="mt-4 space-y-3">
+        {items.length ? (
+          items.map((item, index) => (
+            <div className={`rounded-lg border p-4 ${danger ? "border-red-200 bg-red-50" : "border-blue-100 bg-blue-50"}`} key={`${item}-${index}`}>
+              <p className={`text-sm font-bold ${danger ? "text-red-700" : "text-[var(--ink-blue)]"}`}>{item}</p>
+            </div>
+          ))
+        ) : (
+          <p className="rounded-lg border border-dashed border-blue-200 p-5 text-sm font-semibold text-slate-500">{empty}</p>
+        )}
+      </div>
     </div>
   );
 }
 
-function Badge({
-  value,
-  customClass,
-}: {
-  value: string;
-  customClass?: string;
-}) {
+function Info({ label, value }: { label: string; value: string }) {
   return (
-    <span
-      className={`px-4 py-2 rounded-full text-sm ${
-        customClass || "bg-zinc-800 text-gray-300"
-      }`}
-    >
-      {value}
-    </span>
+    <div className="rounded-lg border border-blue-100 bg-white p-4">
+      <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-800">{value}</p>
+    </div>
   );
 }
 
 function ActionButton({
   label,
-  color,
+  icon,
   onClick,
   disabled,
+  tone,
 }: {
   label: string;
-  color: string;
+  icon: React.ReactNode;
   onClick: () => void;
   disabled: boolean;
+  tone: "primary" | "success" | "warning" | "danger";
 }) {
+  const tones = {
+    primary: "bg-[var(--carrier-blue)] hover:bg-[var(--ink-blue)]",
+    success: "bg-emerald-600 hover:bg-emerald-700",
+    warning: "bg-amber-600 hover:bg-amber-700",
+    danger: "bg-red-600 hover:bg-red-700",
+  };
+
   return (
     <button
-      onClick={onClick}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${tones[tone]}`}
       disabled={disabled}
-      className={`${color} px-6 py-3 rounded-2xl font-semibold transition disabled:opacity-50`}
+      onClick={onClick}
+      type="button"
     >
+      {icon}
       {label}
     </button>
   );
