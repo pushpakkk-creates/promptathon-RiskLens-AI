@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy import JSON
 from datetime import datetime
 
 from app.database import Base
@@ -29,6 +29,18 @@ class Contract(Base):
     recommendation = Column(String)
     status = Column(String, default="REVIEW")
 
+    # Workflow ownership
+    submitted_by = Column(String, nullable=True)
+    assigned_manager = Column(String, nullable=True)
+
+    workflow_status = Column(
+        String,
+        default="AI_ANALYZED"
+    )
+
+    analyst_notes = Column(Text, nullable=True)
+    manager_notes = Column(Text, nullable=True)
+
     # Flexible structured intelligence
     procurement_kpis = Column(JSON)
     risk_breakdown = Column(JSON)
@@ -39,3 +51,5 @@ class Contract(Base):
     executive_summary = Column(Text)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    

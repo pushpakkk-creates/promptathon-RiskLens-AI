@@ -1,304 +1,109 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ArrowRight, Building2, FileCheck2, ShieldCheck, Workflow } from "lucide-react";
 import { useRouter } from "next/navigation";
-import api from "@/lib/api";
 
-type SummaryData = {
-  total_contracts: number;
-  low_risk: number;
-  moderate_risk: number;
-  high_risk: number;
-  critical_risk: number;
-  average_risk_score: number;
-};
+const flow = [
+  { title: "Upload HVAC contract", detail: "PDF procurement tender, AMC, SLA, or vendor agreement" },
+  { title: "Validate document", detail: "Rejects resumes and irrelevant files through procurement keywords" },
+  { title: "Analyze risk", detail: "Extracts KPIs, missing clauses, vendor criteria, and risk bands" },
+  { title: "Manager decision", detail: "Approves, rejects, or sends negotiation mail to the vendor" },
+];
 
-type Contract = {
-  id: number;
-  filename: string;
-  document_type: string;
-  vendor_name: string;
-  contract_value: string;
-  currency: string;
-  overall_risk_score: number;
-  risk_band: string;
-  recommendation: string;
-  status: string;
-  created_at: string;
-};
-
-export default function Home() {
+export default function LandingPage() {
   const router = useRouter();
 
-  const [summary, setSummary] = useState<SummaryData | null>(null);
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    fetchSummary();
-    fetchContracts();
-  }, []);
-
-  const fetchSummary = async () => {
-    try {
-      const response = await api.get("/dashboard/summary");
-      setSummary(response.data);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const fetchContracts = async () => {
-    try {
-      const response = await api.get("/dashboard/contracts");
-      setContracts(response.data);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-const uploadContract = async (
-  event: React.ChangeEvent<HTMLInputElement>
-) => {
-  const file = event.target.files?.[0];
-
-  if (!file) return;
-
-  try {
-    setUploading(true);
-    setError("");
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const response = await api.post(
-      "/contracts/upload",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
-
-    router.push(`/contracts/${response.data.contract_id}`);
-  } catch (error: any) {
-    console.error(error);
-
-    if (error.response?.data?.detail) {
-      setError(error.response.data.detail);
-    } else {
-      setError(
-        "Upload failed. Please upload a valid procurement contract PDF."
-      );
-    }
-  } finally {
-    setUploading(false);
-  }
-};
-
-  const getRiskBadge = (risk: string) => {
-    if (risk === "CRITICAL PROCUREMENT RISK") {
-      return "bg-red-950 text-red-400";
-    }
-
-    if (risk === "HIGH PROCUREMENT RISK") {
-      return "bg-orange-950 text-orange-400";
-    }
-
-    if (risk === "MODERATE PROCUREMENT RISK") {
-      return "bg-yellow-900 text-yellow-400";
-    }
-
-    return "bg-green-900 text-green-400";
-  };
-
-  const getStatusBadge = (status: string) => {
-    if (status === "APPROVED") {
-      return "bg-green-950 text-green-400";
-    }
-
-    if (status === "REJECTED") {
-      return "bg-red-950 text-red-400";
-    }
-
-    if (status === "ESCALATED") {
-      return "bg-orange-950 text-orange-400";
-    }
-
-    return "bg-yellow-900 text-yellow-400";
-  };
-
-  if (!summary) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center text-xl">
-        Loading RiskLens AI...
-      </div>
-    );
-  }
-
   return (
-    <main className="min-h-screen bg-black text-white p-8">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-10">
-        <div>
-          <h1 className="text-5xl font-bold tracking-tight">
+    <main className="min-h-screen bg-[var(--background)] text-slate-950">
+      <nav className="flex items-center justify-between border-b border-blue-100 bg-white px-5 py-4 sm:px-10">
+        <button className="flex items-center gap-3" onClick={() => router.push("/")} type="button">
+          <span className="grid h-11 w-11 place-items-center rounded-lg bg-[var(--ink-blue)] text-white">
+            <ShieldCheck size={22} />
+          </span>
+          <span className="text-left">
+            <span className="block text-2xl font-black text-[var(--ink-blue)]">RiskLens AI</span>
+            <span className="block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+              Procurement Governance
+            </span>
+          </span>
+        </button>
+
+        <button
+          className="inline-flex items-center gap-2 rounded-lg bg-[var(--carrier-blue)] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-[var(--ink-blue)]"
+          onClick={() => router.push("/login")}
+          type="button"
+        >
+          Login
+          <ArrowRight size={16} />
+        </button>
+      </nav>
+
+      <section className="mx-auto grid max-w-7xl gap-10 px-5 py-10 sm:px-10 lg:grid-cols-[0.9fr_1.1fr] lg:py-14">
+        <div className="flex min-h-[560px] flex-col justify-center">
+          <p className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[var(--carrier-blue)]">
+            <Building2 size={16} />
+            Carrier Blue HVAC Desk
+          </p>
+          <h1 className="mt-7 max-w-3xl text-5xl font-black leading-[1.02] text-[var(--ink-blue)] sm:text-6xl">
             RiskLens AI
           </h1>
-
-          <p className="text-gray-400 mt-3 text-lg">
-            AI-Powered Procurement Risk Intelligence Platform
-          </p>
-        </div>
-
-        <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-2xl font-semibold transition">
-          {uploading ? "Analyzing..." : "Upload Contract"}
-
-          <input
-            type="file"
-            accept=".pdf"
-            onChange={uploadContract}
-            className="hidden"
-          />
-        </label>
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="mb-8 bg-red-900 border border-red-700 text-red-200 px-6 py-4 rounded-2xl max-w-3xl">
-          <p className="font-bold text-lg">
-            Invalid Upload
+          <p className="mt-5 max-w-2xl text-xl font-semibold leading-8 text-slate-650">
+            A role-based HVAC procurement cockpit for contract validation, clause risk scoring, vendor selection,
+            analyst escalation, and manager approval.
           </p>
 
-          <p className="mt-2 text-sm">
-            {error}
-          </p>
+          <div className="mt-9 flex flex-wrap gap-3">
+            <button
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--carrier-blue)] px-6 py-4 font-black text-white shadow-sm transition hover:bg-[var(--ink-blue)]"
+              onClick={() => router.push("/login")}
+              type="button"
+            >
+              Start Review
+              <ArrowRight size={18} />
+            </button>
+            <button
+              className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-6 py-4 font-black text-[var(--ink-blue)]"
+              onClick={() => router.push("/manager/dashboard")}
+              type="button"
+            >
+              Manager Queue
+            </button>
+          </div>
         </div>
-      )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-10">
-        <MetricCard
-          title="Total Contracts"
-          value={summary.total_contracts}
-        />
+        <div className="rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between border-b border-blue-100 pb-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Live workflow</p>
+              <h2 className="mt-1 text-2xl font-black text-[var(--ink-blue)]">Procurement governance flow</h2>
+            </div>
+            <Workflow className="text-[var(--carrier-blue)]" size={28} />
+          </div>
 
-        <MetricCard
-          title="Low Risk"
-          value={summary.low_risk}
-        />
+          <div className="mt-6 space-y-4">
+            {flow.map((item, index) => (
+              <div className="grid grid-cols-[44px_1fr] gap-4" key={item.title}>
+                <span className="grid h-11 w-11 place-items-center rounded-lg bg-blue-50 text-lg font-black text-[var(--carrier-blue)]">
+                  {index + 1}
+                </span>
+                <div className="rounded-lg border border-blue-100 bg-[#fbfdff] p-4">
+                  <p className="font-black text-slate-950">{item.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{item.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
 
-        <MetricCard
-          title="Moderate Risk"
-          value={summary.moderate_risk}
-        />
-
-        <MetricCard
-          title="High Risk"
-          value={summary.high_risk}
-        />
-
-        <MetricCard
-          title="Critical Risk"
-          value={summary.critical_risk}
-        />
-      </div>
-
-      {/* Portfolio Table */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl shadow-xl p-6">
-        <h2 className="text-2xl font-bold mb-6">
-          Contract Portfolio
-        </h2>
-
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-gray-400 border-b border-zinc-800">
-                <th className="pb-4">File</th>
-                <th className="pb-4">Type</th>
-                <th className="pb-4">Value</th>
-                <th className="pb-4">Risk Score</th>
-                <th className="pb-4">Risk Band</th>
-                <th className="pb-4">Recommendation</th>
-                <th className="pb-4">Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {contracts.map((contract) => (
-                <tr
-                  key={contract.id}
-                  onClick={() =>
-                    router.push(`/contracts/${contract.id}`)
-                  }
-                  className="border-b border-zinc-800 hover:bg-zinc-800 transition cursor-pointer"
-                >
-                  <td className="py-4">
-                    {contract.filename}
-                  </td>
-
-                  <td className="py-4">
-                    {contract.document_type}
-                  </td>
-
-                  <td className="py-4">
-                    {contract.currency} {contract.contract_value}
-                  </td>
-
-                  <td className="py-4">
-                    {contract.overall_risk_score}
-                  </td>
-
-                  <td className="py-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-semibold ${getRiskBadge(
-                        contract.risk_band
-                      )}`}
-                    >
-                      {contract.risk_band}
-                    </span>
-                  </td>
-
-                  <td className="py-4">
-                    {contract.recommendation}
-                  </td>
-
-                  <td className="py-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusBadge(
-                        contract.status
-                      )}`}
-                    >
-                      {contract.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {["Low", "High", "Critical"].map((risk) => (
+              <div className="rounded-lg border border-blue-100 bg-blue-50 p-4" key={risk}>
+                <FileCheck2 className="text-[var(--carrier-blue)]" size={20} />
+                <p className="mt-3 text-sm font-black text-[var(--ink-blue)]">{risk} risk routing</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
     </main>
-  );
-}
-
-function MetricCard({
-  title,
-  value
-}: {
-  title: string;
-  value: number;
-}) {
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
-      <h3 className="text-gray-400 text-sm uppercase">
-        {title}
-      </h3>
-
-      <p className="text-3xl font-bold mt-3">
-        {value}
-      </p>
-    </div>
   );
 }

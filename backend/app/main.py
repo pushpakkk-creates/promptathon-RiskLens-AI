@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.database import init_db
 from app.routes import contracts
 from app.routes import dashboard
 
 app = FastAPI(
-    title="ProcureGuard AI",
+    title="RiskLens AI",
     version="1.0.0"
 )
 
@@ -32,6 +33,11 @@ app.include_router(
     prefix="/dashboard",
     tags=["Dashboard"]
 )
+
+
+@app.on_event("startup")
+def startup():
+    init_db()
 
 
 @app.get("/")

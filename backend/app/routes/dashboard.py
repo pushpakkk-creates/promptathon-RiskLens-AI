@@ -1,16 +1,56 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.contract import Contract
+from app.services.citation_engine import (
+    build_clause_citations,
+    build_fallback_citations,
+    load_pages_from_upload,
+)
 
 router = APIRouter()
 
 
-class StatusUpdate(BaseModel):
-    status: str
+def apply_contract_filters(query, risk_band, document_type, workflow_status):
+    if risk_band and risk_band != "ALL":
+        query = query.filter(Contract.risk_band == risk_band)
+
+    if document_type and document_type != "ALL":
+        query = query.filter(Contract.document_type == document_type)
+
+    if workflow_status and workflow_status != "ALL":
+        query = query.filter(Contract.workflow_status == workflow_status)
+
+    return query
+
+
+def serialize_contract(contract: Contract):
+    data = {
+        column.name: getattr(contract, column.name)
+        for column in Contract.__table__.columns
+    }
+
+    kpis = data.get("procurement_kpis") or {}
+    citations = kpis.get("clause_citations")
+
+    if not citations:
+        pages = load_pages_from_upload(contract.filename)
+
+        if pages:
+            citations = build_clause_citations(
+                pages,
+                contract.risk_reasons or [],
+                contract.missing_clauses or []
+            )
+        else:
+            citations = build_fallback_citations(contract)
+
+    data["clause_citations"] = citations
+    data["data_source"] = "supabase"
+
+    return data
 
 
 @router.get("/summary")
@@ -43,73 +83,48 @@ def dashboard_summary(db: Session = Depends(get_db)):
         "moderate_risk": moderate_risk,
         "high_risk": high_risk,
         "critical_risk": critical_risk,
-        "average_risk_score": round(avg_risk or 0, 2)
+        "average_risk_score": round(avg_risk or 0, 2),
+        "data_source": "supabase"
+    }
+
+
+@router.get("/health")
+def dashboard_health(db: Session = Depends(get_db)):
+    latest_contract = db.query(Contract).order_by(
+        Contract.created_at.desc()
+    ).first()
+
+    return {
+        "database": "supabase_postgres",
+        "connected": True,
+        "contracts_count": db.query(Contract).count(),
+        "latest_contract_id": latest_contract.id if latest_contract else None,
+        "latest_contract_filename": latest_contract.filename if latest_contract else None,
     }
 
 
 @router.get("/contracts")
-def list_contracts(db: Session = Depends(get_db)):
-    contracts = db.query(Contract).order_by(
+def list_contracts(
+    risk_band: str | None = Query(default=None),
+    document_type: str | None = Query(default=None),
+    workflow_status: str | None = Query(default=None),
+    db: Session = Depends(get_db)
+):
+    query = apply_contract_filters(
+        db.query(Contract),
+        risk_band,
+        document_type,
+        workflow_status
+    )
+
+    return query.order_by(
         Contract.created_at.desc()
     ).all()
 
-    result = []
-
-    for contract in contracts:
-        result.append({
-            "id": contract.id,
-            "filename": contract.filename,
-            "document_type": contract.document_type,
-            "vendor_name": contract.vendor_name,
-            "contract_value": contract.contract_value,
-            "currency": contract.currency,
-            "overall_risk_score": contract.overall_risk_score,
-            "risk_band": contract.risk_band,
-            "recommendation": contract.recommendation,
-            "status": contract.status,
-            "created_at": contract.created_at
-        })
-
-    return result
-
 
 @router.get("/contracts/{contract_id}")
-def get_contract_detail(contract_id: int, db: Session = Depends(get_db)):
-    contract = db.query(Contract).filter(
-        Contract.id == contract_id
-    ).first()
-
-    if not contract:
-        return {"error": "Contract not found"}
-
-    return {
-        "id": contract.id,
-        "filename": contract.filename,
-        "document_type": contract.document_type,
-        "vendor_name": contract.vendor_name,
-        "contract_value": contract.contract_value,
-        "currency": contract.currency,
-        "contract_duration_months": contract.contract_duration_months,
-        "emd_amount": contract.emd_amount,
-        "security_deposit_percent": contract.security_deposit_percent,
-        "retention_percent": contract.retention_percent,
-        "overall_risk_score": contract.overall_risk_score,
-        "risk_band": contract.risk_band,
-        "recommendation": contract.recommendation,
-        "status": contract.status,
-        "procurement_kpis": contract.procurement_kpis,
-        "risk_breakdown": contract.risk_breakdown,
-        "missing_clauses": contract.missing_clauses,
-        "risk_reasons": contract.risk_reasons,
-        "executive_summary": contract.executive_summary,
-        "created_at": contract.created_at
-    }
-
-
-@router.patch("/contracts/{contract_id}/status")
-def update_contract_status(
+def get_contract_detail(
     contract_id: int,
-    payload: StatusUpdate,
     db: Session = Depends(get_db)
 ):
     contract = db.query(Contract).filter(
@@ -117,13 +132,104 @@ def update_contract_status(
     ).first()
 
     if not contract:
-        return {"error": "Contract not found"}
+        raise HTTPException(
+            status_code=404,
+            detail="Contract not found"
+        )
 
-    contract.status = payload.status
-    db.commit()
-    db.refresh(contract)
+    return serialize_contract(contract)
+
+
+@router.get("/analyst/{email}")
+def analyst_dashboard(
+    email: str,
+    risk_band: str | None = Query(default=None),
+    document_type: str | None = Query(default=None),
+    workflow_status: str | None = Query(default=None),
+    db: Session = Depends(get_db)
+):
+    query = apply_contract_filters(
+        db.query(Contract),
+        risk_band,
+        document_type,
+        workflow_status
+    )
+
+    contracts = query.order_by(
+        Contract.created_at.desc()
+    ).all()
+
+    my_contracts = [
+        c for c in contracts
+        if c.submitted_by == email
+    ]
 
     return {
-        "message": "Status updated successfully",
-        "status": contract.status
+        "total_uploaded": len(my_contracts),
+        "portfolio_total": len(contracts),
+        "pending_review": len([
+            c for c in contracts
+            if c.workflow_status == "PENDING_MANAGER_REVIEW"
+        ]),
+        "approved": len([
+            c for c in contracts
+            if c.workflow_status == "APPROVED"
+        ]),
+        "escalated": len([
+            c for c in contracts
+            if c.workflow_status == "ESCALATED"
+        ]),
+        "contracts": contracts,
+        "data_source": "supabase"
+    }
+
+
+@router.get("/manager")
+def manager_dashboard(
+    risk_band: str | None = Query(default=None),
+    document_type: str | None = Query(default=None),
+    workflow_status: str | None = Query(default=None),
+    db: Session = Depends(get_db)
+):
+    queue_statuses = [
+        "PENDING_MANAGER_REVIEW",
+        "ESCALATED"
+    ]
+
+    query = db.query(Contract).filter(
+        Contract.workflow_status.in_(queue_statuses)
+    )
+
+    query = apply_contract_filters(
+        query,
+        risk_band,
+        document_type,
+        workflow_status
+    )
+
+    contracts = query.order_by(
+        Contract.created_at.desc()
+    ).all()
+
+    all_contracts = db.query(Contract).order_by(
+        Contract.created_at.desc()
+    ).all()
+
+    return {
+        "pending_count": len(contracts),
+        "approval_queue": contracts,
+        "total_reviewed": len([
+            c for c in all_contracts
+            if c.workflow_status in ["APPROVED", "REJECTED", "SENT_BACK"]
+        ]),
+        "approved": len([
+            c for c in all_contracts
+            if c.workflow_status == "APPROVED"
+        ]),
+        "rejected": len([
+            c for c in all_contracts
+            if c.workflow_status == "REJECTED"
+        ]),
+        "all_contracts": all_contracts,
+        "data_source": "supabase"
     }
