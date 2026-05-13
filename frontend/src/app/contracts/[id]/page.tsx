@@ -139,12 +139,14 @@ export default function ContractPage() {
         <div className="grid gap-8 xl:grid-cols-[1fr_330px]">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--carrier-blue)]">Contract RL-{contract.id}</p>
-            <h1 className="mt-2 text-4xl font-black text-[var(--ink-blue)]">{contract.filename}</h1>
+            <h1 className="mt-2 text-4xl font-black text-[var(--ink-blue)]">
+  {contract.filename.replace(/_/g, " ").replace(".pdf", "")}
+</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
               {contract.executive_summary || "AI executive summary will appear after analysis."}
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <Badge value={contract.data_source || "supabase"} />
+              <Badge value="AI Analyzed" />
               <Badge value={contract.vendor_name || "Vendor unspecified"} />
               <Badge value={contract.document_type || "Other"} />
               <Badge tone={riskTone(contract.risk_band)} value={contract.risk_band} />
@@ -155,7 +157,10 @@ export default function ContractPage() {
           <div className="rounded-lg border border-blue-100 bg-blue-50 p-5">
             <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Overall risk score</p>
             <p className="mt-3 text-6xl font-black text-[var(--ink-blue)]">{contract.overall_risk_score || 0}</p>
-            <p className="mt-2 text-sm font-bold text-slate-600">Recommendation: {formatLabel(contract.recommendation)}</p>
+<p className="mt-2 text-sm font-bold text-slate-600">Recommendation: {formatLabel(contract.recommendation)}</p>
+<div className="mt-3">
+  <Badge tone={riskTone(contract.risk_band)} value={contract.risk_band} />
+</div>
           </div>
         </div>
 
@@ -209,10 +214,10 @@ export default function ContractPage() {
 
           <Panel icon={<FileSearch size={20} />} title="Commercial KPIs">
             <div className="grid gap-4 sm:grid-cols-2">
-              <StatCard label="Value" value={`${contract.currency || "INR"} ${contract.contract_value || "N/A"}`} />
-              <StatCard label="Duration" value={`${contract.contract_duration_months || 0} months`} />
-              <StatCard label="Security deposit" value={`${contract.security_deposit_percent || 0}%`} />
-              <StatCard label="Retention" value={`${contract.retention_percent || 0}%`} />
+              <StatCard label="Contract Value" value={contract.contract_value ? `${contract.currency || "INR"} ${contract.contract_value}` : "Not specified"} />
+<StatCard label="Duration" value={contract.contract_duration_months ? `${contract.contract_duration_months} months` : "Not specified"} />
+<StatCard label="Security Deposit" value={contract.security_deposit_percent ? `${contract.security_deposit_percent}%` : "Not specified"} />
+<StatCard label="Retention" value={contract.retention_percent ? `${contract.retention_percent}%` : "Not specified"} />
             </div>
           </Panel>
         </div>

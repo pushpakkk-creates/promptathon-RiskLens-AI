@@ -23,9 +23,10 @@ type NavItem = {
 
 const analystItems: NavItem[] = [
   { id: "overview", label: "Overview", icon: <Home size={18} /> },
+  { id: "upload", label: "Upload", icon: <UploadCloud size={18} /> },
   { id: "contracts", label: "Contracts", icon: <FileSearch size={18} /> },
   { id: "insights", label: "Risk Insights", icon: <Gauge size={18} /> },
-  { id: "upload", label: "Upload", icon: <UploadCloud size={18} /> },
+  
 ];
 
 const managerItems: NavItem[] = [
@@ -55,20 +56,22 @@ export default function AppShell({
         <aside className="border-r border-blue-100 bg-white">
           <div className="flex h-full flex-col px-5 py-6">
             <button
-              className="flex items-center gap-3 text-left"
-              onClick={() => router.push("/")}
-              type="button"
-            >
-              <span className="grid h-11 w-11 place-items-center rounded-lg bg-[var(--ink-blue)] text-white">
-                <ShieldCheck size={22} />
-              </span>
-              <span>
-                <span className="block text-2xl font-black text-[var(--ink-blue)]">RiskLens</span>
-                <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  HVAC Procurement
-                </span>
-              </span>
-            </button>
+  className="flex items-center gap-3 text-left"
+  onClick={() => router.push("/")}
+  type="button"
+>
+  <img
+    src="/carrier_logo.png"
+    alt="Carrier"
+     className="h-20 w-28 rounded-lg object-contain "
+  />
+  <span>
+    <span className="block text-2xl font-black text-[var(--ink-blue)]">RiskLens</span>
+    <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+      Contract Risk Intelligence
+    </span>
+  </span>
+</button>
 
             <nav className="mt-10 space-y-2">
               {items.map((item) => (

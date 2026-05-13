@@ -23,3 +23,14 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Python virtual environment
+backend/vnev/
+backend/venv/
+backend/.venv/
+__pycache__/
+*.pyc
+
+# Node
+frontend/package-lock.json
+node_modules/

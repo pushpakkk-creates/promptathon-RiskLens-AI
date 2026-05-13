@@ -25,26 +25,34 @@ export default function LoginPage() {
       <section className="hidden border-r border-blue-100 bg-[var(--ink-blue)] px-12 py-12 text-white lg:flex lg:flex-col lg:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <span className="grid h-12 w-12 place-items-center rounded-lg bg-white text-[var(--ink-blue)]">
-              <ShieldCheck size={25} />
-            </span>
-            <div>
-              <p className="text-3xl font-black">RiskLens AI</p>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-100">HVAC governance</p>
-            </div>
+            <img
+  src="/carrier_logo.png"
+  alt="Carrier"
+  className="h-14 w-18 rounded-lg object-contain bg-white p-1"
+/>
+<div>
+  <p className="text-3xl font-black">RiskLens AI</p>
+  <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-100">Contract Risk Intelligence</p>
+</div>
           </div>
-
-          <h1 className="mt-20 max-w-2xl text-5xl font-black leading-tight">
-            Sign in as analyst or manager and continue the procurement decision chain.
-          </h1>
+<h1 className="mt-20 max-w-2xl text-5xl font-black leading-tight">
+  AI-powered contract intelligence<br />
+   Analyze risk, review clauses, and make faster decisions.
+</h1>
+         
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          {["Validation", "Risk score", "Approval"].map((item) => (
-            <div className="rounded-lg border border-white/20 bg-white/10 p-4" key={item}>
-              <p className="text-sm font-black">{item}</p>
-            </div>
-          ))}
+         {[
+  { label: "AI Clause Analysis", detail: "Instant risk detection" },
+  { label: "Risk Scoring", detail: "0–100 risk intelligence" },
+  { label: "Manager Approval", detail: "Full governance chain" },
+].map((item) => (
+  <div className="rounded-lg border border-white/20 bg-white/10 p-4" key={item.label}>
+    <p className="text-sm font-black">{item.label}</p>
+    <p className="mt-1 text-xs text-blue-200">{item.detail}</p>
+  </div>
+))}
         </div>
       </section>
 

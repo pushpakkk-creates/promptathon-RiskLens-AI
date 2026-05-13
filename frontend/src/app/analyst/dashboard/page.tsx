@@ -99,36 +99,36 @@ export default function AnalystDashboard() {
 
   return (
     <AppShell active={active} onChange={setActive} role="analyst">
-      <Header
-        eyebrow="Analyst workspace"
-        title="HVAC Contract Review"
-        description="Upload, validate, analyze, filter, and submit contracts into manager governance."
-      />
-
+     <Header
+  eyebrow="AI Contract Intelligence"
+  title="Contract Risk Analysis"
+  description="Upload and analyze contracts instantly — extract risk insights, clause analysis, and vendor intelligence."
+  onUpload={() => setActive("upload")}
+/>
       {active === "overview" ? (
         <div className="space-y-6">
-          <section className="rounded-xl border border-blue-100 bg-[var(--ink-blue)] p-6 text-white shadow-sm">
+         
+<section className="rounded-xl border border-blue-100 bg-gradient-to-r from-[var(--ink-blue)] to-[#003087] p-6 text-white shadow-sm">
             <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">Supabase live portfolio</p>
-                <h2 className="mt-2 text-3xl font-black">Procurement risk command center</h2>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-blue-50">
-                  This dashboard is reading the full Supabase contract portfolio, then separating analyst-owned uploads,
-                  manager review states, and HVAC risk clusters.
-                </p>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">Live contract portfolio</p>
+<h2 className="mt-2 text-3xl font-black">Contract Risk Command Center</h2>
+<p className="mt-3 max-w-3xl text-sm leading-6 text-blue-50">
+  AI-powered contract intelligence giving you instant risk scores, clause analysis, and vendor insights across your entire contract portfolio.
+</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <HeroMetric label="Data source" value={data.data_source || "supabase"} icon={<Database size={18} />} />
-                <HeroMetric label="Portfolio rows" value={data.portfolio_total || contracts.length} icon={<TrendingUp size={18} />} />
+                {/* <HeroMetric label="Contracts source" value="Live Database" icon={<Database size={18} />} /> */}
+                
               </div>
             </div>
           </section>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Portfolio documents" value={data.portfolio_total || contracts.length} detail="All contracts from Supabase" />
-            <StatCard label="My uploads" value={data.total_uploaded} detail="Submitted by current analyst" />
-            <StatCard label="Pending review" value={data.pending_review} detail="Submitted to manager" />
-            <StatCard label="Average risk" value={avgRisk} detail="Across current filtered view" />
+           <StatCard label="Total Contracts" value={data.portfolio_total || contracts.length} detail="All contracts in the system" />
+<StatCard label="My Contracts" value={data.total_uploaded} detail="Uploaded by you" />
+<StatCard label="Awaiting Manager" value={data.pending_review} detail="Submitted for review" />
+<StatCard label="Avg Risk Score" value={avgRisk} detail="Across current filtered view" />
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -181,14 +181,13 @@ export default function AnalystDashboard() {
                 {uploading ? "Analyzing contract..." : "Drop or choose a PDF contract"}
               </span>
               <span className="mt-2 max-w-lg text-sm leading-6 text-slate-600">
-                RiskLens validates procurement keywords first, then extracts HVAC KPIs, missing clauses, vendor criteria,
-                and risk score.
-              </span>
+  Upload your contract and get instant AI-powered risk analysis, clause insights, and vendor intelligence.
+</span>
               <input accept=".pdf" className="hidden" disabled={uploading} onChange={uploadContract} type="file" />
             </label>
 
             <div className="rounded-lg border border-blue-100 bg-white p-5">
-              <p className="font-black text-[var(--ink-blue)]">Accepted HVAC procurement signals</p>
+              <p className="font-black text-[var(--ink-blue)]">Accepted Contract Document Types</p>
               <div className="mt-4 space-y-3 text-sm font-semibold text-slate-600">
                 {["Tender or RFP", "AMC or maintenance SLA", "Payment, warranty, EMD", "Vendor turnover and certification"].map((item) => (
                   <div className="flex items-center gap-2" key={item}>
@@ -250,7 +249,7 @@ function RiskInsights({ contracts }: { contracts: Contract[] }) {
   );
 }
 
-function Header({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+function Header({ eyebrow, title, description, onUpload }: { eyebrow: string; title: string; description: string; onUpload: () => void }) {
   return (
     <div className="mb-6 flex flex-col justify-between gap-4 border-b border-blue-100 pb-6 lg:flex-row lg:items-end">
       <div>
@@ -258,9 +257,18 @@ function Header({ eyebrow, title, description }: { eyebrow: string; title: strin
         <h1 className="mt-2 text-4xl font-black text-[var(--ink-blue)]">{title}</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>
       </div>
+      <button
+        onClick={onUpload}
+        className="inline-flex items-center gap-2 rounded-lg bg-[var(--carrier-blue)] px-9 py-5 font-black text-white shadow-sm transition hover:bg-[var(--ink-blue)] whitespace-nowrap"
+        type="button"
+      >
+        <FileUp size={18} />
+        Upload Contract
+      </button>
     </div>
   );
 }
+
 
 function HeroMetric({ label, value, icon }: { label: string; value: string | number; icon: React.ReactNode }) {
   return (
