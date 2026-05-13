@@ -61,7 +61,7 @@ export default function AppShell({
   type="button"
 >
   <img
-    src="/carrier_logo.png"
+    src="\carrier_logo.jpeg"
     alt="Carrier"
      className="h-20 w-28 rounded-lg object-contain "
   />

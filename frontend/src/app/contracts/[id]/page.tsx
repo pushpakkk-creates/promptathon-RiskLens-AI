@@ -50,6 +50,7 @@ export default function ContractPage() {
   });
   const [mail, setMail] = useState<VendorMail | null>(null);
   const [error, setError] = useState("");
+  const [hoveredCategory, setHoveredCategory] = useState<string>("Commercial");
 
   const fetchContract = useCallback(async () => {
     const response = await api.get<Contract>(`/dashboard/contracts/${contractId}`);
@@ -155,11 +156,14 @@ export default function ContractPage() {
           </div>
 
           <div className="rounded-lg border border-blue-100 bg-blue-50 p-5">
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Overall risk score</p>
-            <p className="mt-3 text-6xl font-black text-[var(--ink-blue)]">{contract.overall_risk_score || 0}</p>
-<p className="mt-2 text-sm font-bold text-slate-600">Recommendation: {formatLabel(contract.recommendation)}</p>
-<div className="mt-3">
-  <Badge tone={riskTone(contract.risk_band)} value={contract.risk_band} />
+           <p className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">Overall Risk Score</p>
+<p className="mt-3 text-8xl font-black text-[var(--ink-blue)]">{contract.overall_risk_score || 0}</p>
+<p className="mt-4 text-lg font-black text-slate-700">Recommendation</p>
+<p className="mt-1 text-2xl font-black text-[var(--carrier-blue)]">{formatLabel(contract.recommendation)}</p>
+<div className="mt-4">
+  <span className={`inline-flex items-center rounded-full border px-7 py-5 text-bas font-black ${riskTone(contract.risk_band)}`}>
+    {formatLabel(contract.risk_band)}
+  </span>
 </div>
           </div>
         </div>
@@ -197,32 +201,64 @@ export default function ContractPage() {
       </div>
 
       {active === "overview" ? (
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_0.95fr]">
-          <Panel icon={<Gauge size={20} />} title="Risk breakdown">
-            <div className="h-80 min-h-80 min-w-0">
-              <ResponsiveContainer height="100%" minHeight={320} minWidth={240} width="100%">
-                <BarChart data={riskData}>
-                  <CartesianGrid stroke="#dbeafe" strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tickLine={false} />
-                  <YAxis domain={[0, 100]} tickLine={false} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#005da8" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Panel>
+  <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_0.95fr]">
+    <Panel icon={<Gauge size={20} />} title="Risk breakdown">
+      <div className="h-80 min-h-80 min-w-0">
+        <ResponsiveContainer height="100%" minHeight={320} minWidth={240} width="100%">
+          <BarChart
+            data={riskData}
+            onMouseMove={(state) => {
+              if (state.activeLabel) setHoveredCategory(state.activeLabel);
+            }}
+          >
+            <CartesianGrid stroke="#dbeafe" strokeDasharray="3 3" />
+            <XAxis dataKey="name" tickLine={false} />
+            <YAxis domain={[0, 100]} tickLine={false} />
+            <Tooltip />
+            <Bar dataKey="value" fill="#005da8" radius={[6, 6, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Panel>
 
-          <Panel icon={<FileSearch size={20} />} title="Commercial KPIs">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <StatCard label="Contract Value" value={contract.contract_value ? `${contract.currency || "INR"} ${contract.contract_value}` : "Not specified"} />
-<StatCard label="Duration" value={contract.contract_duration_months ? `${contract.contract_duration_months} months` : "Not specified"} />
-<StatCard label="Security Deposit" value={contract.security_deposit_percent ? `${contract.security_deposit_percent}%` : "Not specified"} />
-<StatCard label="Retention" value={contract.retention_percent ? `${contract.retention_percent}%` : "Not specified"} />
-            </div>
-          </Panel>
+    <Panel icon={<FileSearch size={20} />} title={`${hoveredCategory} KPIs`}>
+      {hoveredCategory === "Commercial" && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StatCard label="Contract Value" value={contract.contract_value ? `${contract.currency || "INR"} ${contract.contract_value}` : "Not specified"} />
+          <StatCard label="Duration" value={contract.contract_duration_months ? `${contract.contract_duration_months} months` : "Not specified"} />
+          <StatCard label="Security Deposit" value={contract.security_deposit_percent ? `${contract.security_deposit_percent}%` : "Not specified"} />
+          <StatCard label="Retention" value={contract.retention_percent ? `${contract.retention_percent}%` : "Not specified"} />
         </div>
-      ) : null}
-
+      )}
+      {hoveredCategory === "Operational" && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StatCard label="SLA Response" value={kpis.sla_response_time_hours ? `${kpis.sla_response_time_hours} hours` : "Not specified"} />
+          <StatCard label="Uptime SLA" value={kpis.sla_uptime_percent ? `${kpis.sla_uptime_percent}%` : "Not specified"} />
+          <StatCard label="Delivery Timeline" value={kpis.delivery_timeline_days ? `${kpis.delivery_timeline_days} days` : "Not specified"} />
+          <StatCard label="Maintenance" value={kpis.maintenance_frequency || "Not specified"} />
+        </div>
+      )}
+      {hoveredCategory === "Legal" && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StatCard label="Warranty" value={kpis.warranty_months ? `${kpis.warranty_months} months` : "Not specified"} />
+          <StatCard label="Payment Terms" value={kpis.payment_terms || "Not specified"} />
+          <StatCard label="Payment Cycle" value={kpis.payment_cycle_days ? `${kpis.payment_cycle_days} days` : "Not specified"} />
+          <StatCard label="Scope" value={kpis.scope_summary || "Not specified"} />
+        </div>
+      )}
+      {hoveredCategory === "Vendor" && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <StatCard label="Min Turnover" value={kpis.minimum_turnover_required || "Not specified"} />
+          <StatCard label="Experience" value={kpis.minimum_experience_years ? `${kpis.minimum_experience_years} years` : "Not specified"} />
+          <StatCard label="Certifications" value={kpis.certifications_required || "Not specified"} />
+        </div>
+      )}
+      <p className="mt-4 text-xs font-semibold text-slate-400">
+        Hover over a bar in the chart to switch category
+      </p>
+    </Panel>
+  </div>
+) : null}
       {active === "clauses" ? (
         <Panel icon={<ShieldAlert size={20} />} title="Clause-level risk marking">
           <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
@@ -304,6 +340,22 @@ function Panel({ title, icon, children }: { title: string; icon: React.ReactNode
     </section>
   );
 }
+function inferCategory(insight: string): { label: string; color: string } {
+  const text = insight.toLowerCase();
+  if (text.includes("payment") || text.includes("value") || text.includes("deposit") || text.includes("retention") || text.includes("emd") || text.includes("advance")) {
+    return { label: "Commercial", color: "bg-blue-100 text-blue-700" };
+  }
+  if (text.includes("sla") || text.includes("uptime") || text.includes("maintenance") || text.includes("delivery") || text.includes("response") || text.includes("timeline")) {
+    return { label: "Operational", color: "bg-purple-100 text-purple-700" };
+  }
+  if (text.includes("penalty") || text.includes("liquidated") || text.includes("legal") || text.includes("warranty") || text.includes("termination") || text.includes("clause")) {
+    return { label: "Legal", color: "bg-red-100 text-red-700" };
+  }
+  if (text.includes("vendor") || text.includes("turnover") || text.includes("certification") || text.includes("experience") || text.includes("criteria")) {
+    return { label: "Vendor", color: "bg-amber-100 text-amber-700" };
+  }
+  return { label: "General", color: "bg-slate-100 text-slate-700" };
+}
 
 function CitationList({ citations }: { citations: ClauseCitation[] }) {
   if (!citations.length) {
@@ -335,17 +387,20 @@ function CitationList({ citations }: { citations: ClauseCitation[] }) {
             {citation.snippet}
           </blockquote>
           <div className="mt-3 flex flex-wrap gap-2">
-            {(citation.matched_terms || []).slice(0, 5).map((term) => (
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600" key={term}>
-                {term}
-              </span>
-            ))}
-            {citation.confidence ? (
-              <span className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-bold text-white">
-                {formatLabel(citation.confidence)}
-              </span>
-            ) : null}
-          </div>
+  <span className={`rounded-full px-2.5 py-1 text-xs font-black ${inferCategory(citation.insight).color}`}>
+    {inferCategory(citation.insight).label}
+  </span>
+  {(citation.matched_terms || []).slice(0, 5).map((term) => (
+    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600" key={term}>
+      {term}
+    </span>
+  ))}
+  {citation.confidence ? (
+    <span className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-bold text-white">
+      {formatLabel(citation.confidence)}
+    </span>
+  ) : null}
+</div>
         </div>
       ))}
     </div>
