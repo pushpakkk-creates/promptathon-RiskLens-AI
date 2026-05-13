@@ -73,25 +73,23 @@ export default function ManagerDashboard() {
   return (
     <AppShell active={active} onChange={setActive} role="manager">
       <Header
-        eyebrow="Manager command center"
-        title="Approval Governance"
-        description="Review escalated HVAC contracts, inspect AI risk rationale, and record vendor decisions."
-      />
-
+  eyebrow="Manager Command Center"
+  title="Contract Approval Governance"
+  description="Review AI-analyzed contracts, inspect risk scores and clause insights, and record vendor decisions."
+/>
       {active === "overview" ? (
         <div className="space-y-6">
-          <section className="rounded-xl border border-blue-100 bg-[var(--ink-blue)] p-6 text-white shadow-sm">
+          <section className="rounded-xl border border-blue-100 bg-gradient-to-r from-[var(--ink-blue)] to-[#003087] p-6 text-white shadow-sm">
             <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">Supabase governance layer</p>
-                <h2 className="mt-2 text-3xl font-black">Manager decision cockpit</h2>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-blue-50">
-                  Review escalations, compare vendor risk concentration, and create approval, rejection, or negotiation
-                  communications from one controlled view.
-                </p>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">Live contract governance</p>
+<h2 className="mt-2 text-3xl font-black">Manager Approval Command Center</h2>
+<p className="mt-3 max-w-3xl text-sm leading-6 text-blue-50">
+  Review AI-analyzed contracts, inspect risk rationale, and record approval, rejection, or negotiation decisions from one controlled view.
+</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <HeroMetric label="Data source" value={data.data_source || "supabase"} icon={<Database size={18} />} />
+                <HeroMetric label="AI Analyzed" value={allContracts.length} icon={<Database size={18} />} />
                 <HeroMetric label="Portfolio rows" value={allContracts.length} icon={<TrendingUp size={18} />} />
               </div>
             </div>

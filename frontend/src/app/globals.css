@@ -4,7 +4,7 @@
   --background: #f5f9fd;
   --foreground: #07182f;
   --ink-blue: #041e42;
-  --carrier-blue: #005da8;
+  --carrier-blue: #003087;  /* ← change from #005da8 to Carrier's true blue */
   --sky-blue: #e7f3ff;
   --border: #cfe2f3;
   --card: #ffffff;
