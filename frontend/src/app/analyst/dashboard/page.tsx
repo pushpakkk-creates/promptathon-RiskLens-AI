@@ -9,7 +9,7 @@ import { AxiosError } from "axios";
 import { AlertTriangle, ClipboardList, Database, FileUp, Gauge, ShieldCheck, TrendingUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 type Filters = {
   risk_band: string;
@@ -140,7 +140,12 @@ export default function AnalystDashboard() {
                     <XAxis dataKey="name" tickLine={false} />
                     <YAxis allowDecimals={false} tickLine={false} />
                     <Tooltip />
-                    <Bar dataKey="count" fill="#005da8" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+  <Cell fill="#138a4d" />
+  <Cell fill="#d99a00" />
+  <Cell fill="#e56b1f" />
+  <Cell fill="#c82032" />
+</Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>

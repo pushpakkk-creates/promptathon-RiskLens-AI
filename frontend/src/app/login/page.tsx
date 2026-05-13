@@ -26,7 +26,7 @@ export default function LoginPage() {
         <div>
           <div className="flex items-center gap-3">
             <img
-  src="/carrier_logo.png"
+  src="\carrier_logo.jpeg"
   alt="Carrier"
   className="h-14 w-18 rounded-lg object-contain bg-white p-1"
 />

@@ -13,10 +13,11 @@ export function StatCard({
   value: string | number;
   detail?: string;
 }) {
+  const isLong = typeof value === "string" && value.length > 20;
   return (
     <div className="rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
       <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-black text-[var(--ink-blue)]">{value}</p>
+      <p className={`mt-3 font-black text-[var(--ink-blue)] leading-tight ${isLong ? "text-base" : "text-3xl"}`}>{value}</p>
       {detail ? <p className="mt-2 text-sm text-slate-500">{detail}</p> : null}
     </div>
   );
