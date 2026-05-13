@@ -88,10 +88,7 @@ export default function ManagerDashboard() {
   Review AI-analyzed contracts, inspect risk rationale, and record approval, rejection, or negotiation decisions from one controlled view.
 </p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <HeroMetric label="AI Analyzed" value={allContracts.length} icon={<Database size={18} />} />
-                <HeroMetric label="Portfolio rows" value={allContracts.length} icon={<TrendingUp size={18} />} />
-              </div>
+             
             </div>
           </section>
 
@@ -107,13 +104,21 @@ export default function ManagerDashboard() {
               <div className="h-72 min-h-72 min-w-0">
                 <ResponsiveContainer height="100%" minHeight={288} minWidth={240} width="100%">
                   <PieChart>
-                    <Pie data={pieData} dataKey="value" innerRadius={70} outerRadius={105} paddingAngle={4}>
-                      {pieData.map((entry, index) => (
-                        <Cell fill={riskColors[index % riskColors.length]} key={entry.name} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
+  <Pie
+    data={pieData}
+    dataKey="value"
+    innerRadius={60}
+    outerRadius={100}
+    paddingAngle={4}
+    label={({ name, value }) => value > 0 ? `${name}: ${value}` : ""}
+    labelLine={true}
+  >
+    {pieData.map((entry, index) => (
+      <Cell fill={riskColors[index % riskColors.length]} key={entry.name} />
+    ))}
+  </Pie>
+  <Tooltip formatter={(value, name) => [value, name]} />
+</PieChart>
                 </ResponsiveContainer>
               </div>
             </Panel>
@@ -127,14 +132,19 @@ export default function ManagerDashboard() {
         </div>
       ) : null}
 
-      {active === "queue" ? (
-        <div className="space-y-6">
-          <Panel title="Approval queue filters" icon={<CheckCircle2 size={20} />}>
-            <Filters filters={filters} onChange={updateFilter} />
-          </Panel>
-          <ContractTable contracts={queue} emptyText="No approval queue items match these filters." onOpen={(id) => router.push(`/contracts/${id}`)} />
-        </div>
-      ) : null}
+      
+{active === "queue" ? (
+  <div className="space-y-6">
+    <Panel title="Approval queue filters" icon={<CheckCircle2 size={20} />}>
+      <Filters filters={filters} onChange={updateFilter} />
+    </Panel>
+    <ContractTable
+      contracts={allContracts}
+      emptyText="No contracts found."
+      onOpen={(id) => router.push(`/contracts/${id}`)}
+    />
+  </div>
+) : null}
 
       {active === "analytics" ? (
         <Panel title="Risk analytics" icon={<BarChart3 size={20} />}>
