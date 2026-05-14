@@ -34,7 +34,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "clauses", label: "Risk Insights" },
   { id: "document", label: "Document KPIs" },
-  { id: "workflow", label: "Workflow" },
+ 
 ];
 
 export default function ContractPage() {
@@ -143,9 +143,9 @@ export default function ContractPage() {
             <h1 className="mt-2 text-4xl font-black text-[var(--ink-blue)]">
   {contract.filename.replace(/_/g, " ").replace(".pdf", "")}
 </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              {contract.executive_summary || "AI executive summary will appear after analysis."}
-            </p>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-700 font-medium">
+  {contract.executive_summary || "AI executive summary will appear after analysis."}
+</p>
             <div className="mt-5 flex flex-wrap gap-2">
               <Badge value="AI Analyzed" />
               <Badge value={contract.vendor_name || "Vendor unspecified"} />
@@ -289,42 +289,7 @@ export default function ContractPage() {
         </Panel>
       ) : null}
 
-      {active === "workflow" ? (
-        <Panel icon={<MailCheck size={20} />} title="Decision and vendor communication">
-          <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
-            <div className="rounded-lg border border-blue-100 bg-blue-50 p-5">
-              <p className="font-black text-[var(--ink-blue)]">Decision controls</p>
-              <div className="mt-4 grid gap-3">
-                <ActionButton disabled={loading} icon={<MailCheck size={17} />} label="Draft approval" onClick={() => composeMail("APPROVE")} tone="success" />
-                <ActionButton disabled={loading} icon={<RotateCcw size={17} />} label="Draft negotiation" onClick={() => composeMail("NEGOTIATE")} tone="warning" />
-                <ActionButton disabled={loading} icon={<XCircle size={17} />} label="Draft rejection" onClick={() => composeMail("REJECT")} tone="danger" />
-                <ActionButton disabled={loading} icon={<MailCheck size={17} />} label="Send approval email" onClick={() => composeMail("APPROVE", true)} tone="primary" />
-              </div>
-              <p className="mt-4 text-sm leading-6 text-slate-600">
-                SMTP is supported through backend env values. Without SMTP credentials, RiskLens safely returns a draft.
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-blue-100 bg-white p-5">
-              {mail ? (
-                <>
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Draft ready</p>
-                  <h3 className="mt-2 text-xl font-black text-[var(--ink-blue)]">{mail.subject}</h3>
-                  <p className="mt-2 text-sm font-semibold text-slate-600">To: {mail.recipient}</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-600">
-                    Delivery: {formatLabel(mail.delivery_status)}. {mail.delivery_reason}
-                  </p>
-                  <pre className="mt-5 whitespace-pre-wrap rounded-lg bg-slate-950 p-4 text-sm leading-6 text-white">{mail.body}</pre>
-                </>
-              ) : (
-                <p className="rounded-lg border border-dashed border-blue-200 bg-white p-8 text-center text-sm font-semibold text-slate-500">
-                  Compose an approval, negotiation, or rejection draft after manager decision.
-                </p>
-              )}
-            </div>
-          </div>
-        </Panel>
-      ) : null}
+      
     </main>
   );
 }
@@ -369,21 +334,20 @@ function CitationList({ citations }: { citations: ClauseCitation[] }) {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-black uppercase tracking-[0.14em] text-slate-500">Cited evidence</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Each insight is mapped to the closest parsed contract wording. New uploads include stronger page and line
-          references because the source PDF is stored during upload.
-        </p>
+        <h3 className="text-base font-black uppercase tracking-[0.14em] text-slate-500">Cited evidence</h3>
+<p className="mt-2 text-base leading-7 text-slate-600">
+  Each insight is mapped to the closest parsed contract wording. New uploads include stronger page and line references.
+</p>
       </div>
       {citations.map((citation, index) => (
         <div className="rounded-lg border border-blue-100 bg-white p-4 shadow-sm" key={`${citation.insight}-${index}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-black text-[var(--ink-blue)]">{citation.insight}</p>
+            <p className="text-base font-black text-[var(--ink-blue)]">{citation.insight}</p>
             <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-black text-[var(--carrier-blue)]">
               {citation.page ? `Page ${citation.page}, lines ${citation.line_start}-${citation.line_end}` : "Absence check"}
             </span>
           </div>
-          <blockquote className="mt-3 border-l-4 border-[var(--carrier-blue)] bg-blue-50 px-4 py-3 text-sm font-semibold leading-6 text-slate-800">
+          <blockquote className="mt-3 border-l-4 border-[var(--carrier-blue)] bg-blue-50 px-4 py-3 text-base font-semibold leading-7 text-slate-800">
             {citation.snippet}
           </blockquote>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -415,7 +379,7 @@ function InsightList({ title, items, empty, danger }: { title: string; items: st
         {items.length ? (
           items.map((item, index) => (
             <div className={`rounded-lg border p-4 ${danger ? "border-red-200 bg-red-50" : "border-blue-100 bg-blue-50"}`} key={`${item}-${index}`}>
-              <p className={`text-sm font-bold ${danger ? "text-red-700" : "text-[var(--ink-blue)]"}`}>{item}</p>
+              <p className={`text-base font-bold ${danger ? "text-red-700" : "text-[var(--ink-blue)]"}`}>{item}</p>
             </div>
           ))
         ) : (

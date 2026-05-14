@@ -19,6 +19,16 @@ from app.services.email_service import compose_vendor_email, send_vendor_email
 
 router = APIRouter()
 
+# Valid workflow transitions — FIX 4
+ALLOWED_TRANSITIONS = {
+    "AI_ANALYZED":            ["SUBMIT_FOR_REVIEW", "ESCALATE"],
+    "PENDING_MANAGER_REVIEW": ["APPROVE", "REJECT", "SEND_BACK", "ESCALATE"],
+    "ESCALATED":              ["APPROVE", "REJECT", "SEND_BACK"],
+    "SENT_BACK":              ["SUBMIT_FOR_REVIEW"],
+    "APPROVED":               [],
+    "REJECTED":               [],
+}
+
 
 class WorkflowAction(BaseModel):
     action: str
@@ -42,13 +52,13 @@ async def upload_contract(
 
         pages = extract_pages_from_pdf(contents)
 
-        text = "\n".join(
-            page["text"]
-            for page in pages
-        )
+        # FIX 2 — check for scanned pages
+        scanned_count = sum(1 for p in pages if p.get("is_scanned", False))
+        total_pages = len(pages)
+
+        text = "\n".join(page["text"] for page in pages)
 
         validation = validate_document(text)
-
         if not validation["valid"]:
             raise HTTPException(
                 status_code=400,
@@ -56,10 +66,9 @@ async def upload_contract(
             )
 
         analysis = extract_contract_data(text)
-
         risk_analysis = calculate_risk(analysis)
-
         missing_clause_analysis = detect_missing_clauses(analysis)
+
         clause_citations = build_clause_citations(
             pages,
             risk_analysis["risk_reasons"],
@@ -72,9 +81,12 @@ async def upload_contract(
         )
 
         workflow_status = "AI_ANALYZED"
-
         if risk_analysis["overall_risk_score"] >= 70:
             workflow_status = "ESCALATED"
+
+        # FIX 3 — save file BEFORE db commit
+        upload_dir = Path(__file__).resolve().parents[2] / "uploads"
+        upload_dir.mkdir(exist_ok=True)
 
         contract = Contract(
             filename=file.filename,
@@ -128,26 +140,34 @@ async def upload_contract(
         db.commit()
         db.refresh(contract)
 
-        upload_dir = Path(__file__).resolve().parents[2] / "uploads"
-        upload_dir.mkdir(exist_ok=True)
+        # FIX 3 — file save after we have contract.id
         safe_name = f"{contract.id}_{file.filename}".replace("/", "_").replace("\\", "_")
-        (upload_dir / safe_name).write_bytes(contents)
+
+        try:
+            (upload_dir / safe_name).write_bytes(contents)
+            file_saved = True
+        except Exception:
+            file_saved = False
 
         return {
             "contract_id": contract.id,
             "filename": contract.filename,
             "workflow_status": contract.workflow_status,
-            "message": "Contract analyzed successfully"
+            "message": "Contract analyzed successfully",
+            # FIX 2 — surface scanned page warning
+            "scanned_pages": scanned_count,
+            "total_pages": total_pages,
+            "warning": (
+                f"{scanned_count} of {total_pages} pages had no readable text — "
+                "citations may be incomplete. Re-upload a text-based PDF for full analysis."
+            ) if scanned_count > 0 else None
         }
 
     except HTTPException:
         raise
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.patch("/{contract_id}/workflow")
@@ -161,9 +181,17 @@ def update_workflow(
     ).first()
 
     if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    # FIX 4 — validate transition is allowed
+    current_status = contract.workflow_status or "AI_ANALYZED"
+    allowed = ALLOWED_TRANSITIONS.get(current_status, [])
+
+    if payload.action not in allowed:
         raise HTTPException(
-            status_code=404,
-            detail="Contract not found"
+            status_code=400,
+            detail=f"Action '{payload.action}' is not allowed from status '{current_status}'. "
+                   f"Allowed actions: {allowed}"
         )
 
     if payload.action == "SUBMIT_FOR_REVIEW":
@@ -189,12 +217,6 @@ def update_workflow(
         contract.status = "CHANGES_REQUESTED"
         contract.manager_notes = payload.notes
 
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid workflow action"
-        )
-
     db.commit()
     db.refresh(contract)
 
@@ -215,18 +237,11 @@ def compose_vendor_mail(
     ).first()
 
     if not contract:
-        raise HTTPException(
-            status_code=404,
-            detail="Contract not found"
-        )
+        raise HTTPException(status_code=404, detail="Contract not found")
 
     decision = payload.decision.upper()
     recipient = payload.recipient_email or "vendor@example.com"
-    subject, body = compose_vendor_email(
-        contract,
-        decision,
-        payload.notes
-    )
+    subject, body = compose_vendor_email(contract, decision, payload.notes)
 
     delivery = (
         send_vendor_email(recipient, subject, body)
@@ -234,7 +249,7 @@ def compose_vendor_mail(
         else {
             "sent": False,
             "status": "draft_ready",
-            "reason": "Draft generated. Set send=true to send through configured SMTP."
+            "reason": "Draft generated. Set send=true to send."
         }
     )
 

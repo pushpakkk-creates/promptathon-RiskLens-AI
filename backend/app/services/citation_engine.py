@@ -1,26 +1,23 @@
 from __future__ import annotations
-
 from pathlib import Path
 import re
-
 from app.services.parser import extract_pages_from_pdf
 
-
 RISK_KEYWORDS = {
-    "payment": ["payment", "invoice", "advance", "mobilization", "cycle"],
-    "retention": ["retention", "withheld", "deduct"],
-    "security": ["security deposit", "performance security", "bank guarantee"],
-    "delivery": ["delivery", "completion", "timeline", "milestone"],
-    "sla": ["sla", "response", "uptime", "service level"],
-    "maintenance": ["maintenance", "amc", "preventive", "corrective"],
-    "warranty": ["warranty", "defect liability", "guarantee"],
-    "penalty": ["penalty", "liquidated damages", "ld"],
-    "liability": ["liability", "indemnity", "damages"],
-    "termination": ["termination", "terminate"],
-    "force": ["force majeure", "act of god"],
-    "turnover": ["turnover", "financial capacity", "revenue"],
-    "experience": ["experience", "similar work", "years"],
-    "certification": ["certification", "iso", "oem", "license"],
+    "payment": ["payment", "invoice", "advance", "mobilization", "cycle", "bill"],
+    "retention": ["retention", "withheld", "deduct", "holdback"],
+    "security": ["security deposit", "performance security", "bank guarantee", "pbg"],
+    "delivery": ["delivery", "completion", "timeline", "milestone", "handover"],
+    "sla": ["sla", "response", "uptime", "service level", "availability"],
+    "maintenance": ["maintenance", "amc", "preventive", "corrective", "servicing"],
+    "warranty": ["warranty", "defect liability", "guarantee", "dlp"],
+    "penalty": ["penalty", "liquidated damages", "ld", "delay damages", "compensation for delay"],
+    "liability": ["liability", "indemnity", "damages", "indemnification"],
+    "termination": ["termination", "terminate", "exit clause", "discontinue"],
+    "force": ["force majeure", "act of god", "unforeseen", "natural disaster"],
+    "turnover": ["turnover", "financial capacity", "revenue", "annual turnover"],
+    "experience": ["experience", "similar work", "years", "track record"],
+    "certification": ["certification", "iso", "oem", "license", "accreditation"],
 }
 
 
@@ -63,8 +60,9 @@ def find_best_citation(pages: list[dict], insight: str):
     for page in pages:
         lines = clean_lines(page.get("text", ""))
 
+        # FIX 2 — wider window (5 lines instead of 3)
         for index in range(len(lines)):
-            window = lines[index:index + 3]
+            window = lines[index:index + 5]
             snippet = " ".join(window)
             score = score_snippet(snippet, terms)
 
@@ -75,7 +73,7 @@ def find_best_citation(pages: list[dict], insight: str):
                     "line_start": index + 1,
                     "line_end": index + len(window),
                     "snippet": snippet[:700],
-                    "matched_terms": [term for term in terms if term in snippet.lower()],
+                    "matched_terms": [t for t in terms if t in snippet.lower()],
                 }
 
     if best:
@@ -86,7 +84,7 @@ def find_best_citation(pages: list[dict], insight: str):
         "page": None,
         "line_start": None,
         "line_end": None,
-        "snippet": "Relevant wording was not found in the stored document text. Re-upload this contract to refresh line-level citations.",
+        "snippet": "Relevant wording was not found in the stored document text.",
         "matched_terms": terms,
         "confidence": "low",
     }
@@ -149,10 +147,15 @@ def terms_for_text(text: str):
         if key in lowered or any(value in lowered for value in values):
             terms.extend(values)
 
+    # FIX 3 — only fall back to word extraction if truly nothing matched
     if not terms:
+        STOP_WORDS = {
+            "missing", "unclear", "clause", "criteria", "terms",
+            "present", "protection", "requirement", "safeguard"
+        }
         terms = [
             word for word in re.findall(r"[a-zA-Z]{5,}", lowered)
-            if word not in {"missing", "unclear", "clause", "criteria", "terms"}
+            if word not in STOP_WORDS
         ][:4]
 
     return list(dict.fromkeys(terms))
