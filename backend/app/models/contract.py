@@ -47,6 +47,14 @@ class Contract(Base):
     missing_clauses = Column(JSON)
     risk_reasons = Column(JSON)
 
+# ADD THESE 3 NEW LINES
+    ambiguity_findings = Column(JSON, nullable=True)
+    ambiguity_risk_level = Column(String, nullable=True)
+    total_ambiguities = Column(Integer, default=0)
+
+
+
+
     # AI narrative
     executive_summary = Column(Text)
 

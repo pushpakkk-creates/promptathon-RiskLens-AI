@@ -4,6 +4,7 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
+
 from app.config import GROQ_API_KEY
 from app.database import get_db
 from app.models.contract import Contract
@@ -16,6 +17,8 @@ from app.services.summary_generator import generate_executive_summary
 from app.services.document_validator import validate_document
 from app.services.citation_engine import build_clause_citations
 from app.services.email_service import compose_vendor_email, send_vendor_email
+from app.services.ambiguity_engine import detect_ambiguities
+from app.services.remediation_engine import generate_clause_recommendations
 
 router = APIRouter()
 
@@ -80,6 +83,8 @@ async def upload_contract(
             risk_analysis
         )
 
+        ambiguity_analysis = detect_ambiguities(text)
+
         workflow_status = "AI_ANALYZED"
         if risk_analysis["overall_risk_score"] >= 70:
             workflow_status = "ESCALATED"
@@ -133,7 +138,11 @@ async def upload_contract(
 
             missing_clauses=missing_clause_analysis["missing_clauses"],
             risk_reasons=risk_analysis["risk_reasons"],
-            executive_summary=executive_summary
+            executive_summary=executive_summary,
+
+            ambiguity_findings=ambiguity_analysis.get("ambiguity_findings", []),
+    ambiguity_risk_level=ambiguity_analysis.get("ambiguity_risk_level", "NONE"),
+    total_ambiguities=ambiguity_analysis.get("total_flagged", 0)
         )
 
         db.add(contract)
@@ -261,6 +270,88 @@ def compose_vendor_mail(
         "sent": delivery["sent"],
         "delivery_reason": delivery["reason"]
     }
+
+# Add this to app/routes/contracts.py
+# Place after the existing vendor-mail route, before model-health
+
+# ── Add this import at the top of contracts.py ──
+# from app.services.remediation_engine import generate_clause_recommendations
+
+
+@router.post("/{contract_id}/recommendations")
+def generate_recommendations(
+    contract_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    On-demand: generate fix recommendations for all flagged risks,
+    missing clauses, and high-impact ambiguities in a contract.
+    Called when the analyst clicks 'Generate Recommendations' in the UI.
+    Results are cached back into the contract row.
+    """
+    contract = db.query(Contract).filter(
+        Contract.id == contract_id
+    ).first()
+
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    # Return cached result if already generated
+    existing = (contract.procurement_kpis or {}).get("recommendations")
+    if existing:
+        return {
+            "contract_id": contract_id,
+            "cached": True,
+            "recommendations": existing.get("recommendations", []),
+            "total_recommendations": existing.get("total_recommendations", 0),
+            "overall_remediation_priority": existing.get("overall_remediation_priority", "NONE"),
+        }
+
+    # Load original contract text for context
+    from app.services.citation_engine import load_pages_from_upload
+    pages = load_pages_from_upload(contract.filename)
+    contract_text = "\n".join(p.get("text", "") for p in pages) if pages else ""
+
+    result = generate_clause_recommendations(
+        risk_reasons=contract.risk_reasons or [],
+        missing_clauses=contract.missing_clauses or [],
+        ambiguity_findings=contract.ambiguity_findings or [],
+        contract_text=contract_text,
+    )
+
+    # Cache in procurement_kpis JSON column
+    kpis = dict(contract.procurement_kpis or {})
+    kpis["recommendations"] = result
+    contract.procurement_kpis = kpis
+    db.commit()
+
+    return {
+        "contract_id": contract_id,
+        "cached": False,
+        "recommendations": result.get("recommendations", []),
+        "total_recommendations": result.get("total_recommendations", 0),
+        "overall_remediation_priority": result.get("overall_remediation_priority", "NONE"),
+    }
+
+
+@router.delete("/{contract_id}/recommendations")
+def clear_recommendations_cache(
+    contract_id: int,
+    db: Session = Depends(get_db)
+):
+    """Clear cached recommendations so they can be regenerated."""
+    contract = db.query(Contract).filter(
+        Contract.id == contract_id
+    ).first()
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    kpis = dict(contract.procurement_kpis or {})
+    kpis.pop("recommendations", None)
+    contract.procurement_kpis = kpis
+    db.commit()
+
+    return {"message": "Recommendations cache cleared."}
 
 
 @router.get("/model-health")
