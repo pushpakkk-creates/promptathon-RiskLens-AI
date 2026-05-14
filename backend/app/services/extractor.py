@@ -66,7 +66,7 @@ Rules:
 - JSON ONLY
 
 Document:
-{text[:20000]}
+{text[:60000]}
 """
 
     response = client.chat.completions.create(

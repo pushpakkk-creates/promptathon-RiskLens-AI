@@ -16,10 +16,13 @@ def calculate_risk(contract_data: dict):
     advance = contract_data.get("advance_payment", False)
     contract_value = contract_data.get("contract_value", "")
 
-    if payment_cycle > 90:
+    # FIX 1 — treat 0 as unknown, not safe
+    if payment_cycle == 0:
+        commercial_score += 15
+        reasons.append("Payment cycle not specified")
+    elif payment_cycle > 90:
         commercial_score += 25
         reasons.append("Excessively long payment cycle")
-
     elif payment_cycle > 60:
         commercial_score += 15
         reasons.append("Extended payment cycle")
@@ -31,7 +34,6 @@ def calculate_risk(contract_data: dict):
     if retention >= 10:
         commercial_score += 20
         reasons.append("High retention percentage")
-
     elif retention >= 5:
         commercial_score += 10
         reasons.append("Moderate retention percentage")
@@ -57,7 +59,6 @@ def calculate_risk(contract_data: dict):
     if delivery == 0:
         operational_score += 20
         reasons.append("Delivery timeline not clearly defined")
-
     elif delivery > 180:
         operational_score += 15
         reasons.append("Potentially unrealistic delivery timeline")
@@ -77,7 +78,6 @@ def calculate_risk(contract_data: dict):
     if warranty == 0:
         operational_score += 15
         reasons.append("Warranty terms missing")
-
     elif warranty < 12:
         operational_score += 10
         reasons.append("Weak warranty coverage")
@@ -87,14 +87,20 @@ def calculate_risk(contract_data: dict):
     # -------------------------
 
     penalty = contract_data.get("penalty_clause_present", False)
+    penalty_percent = contract_data.get("penalty_percent", 0)
+
     ld = contract_data.get("liquidated_damages_present", False)
     liability = contract_data.get("liability_clause_present", False)
     termination = contract_data.get("termination_clause_present", False)
     force_majeure = contract_data.get("force_majeure_present", False)
 
+    # FIX 2 — weak clause scores less than missing but still scores
     if not penalty:
         legal_score += 20
         reasons.append("Penalty clause missing")
+    elif penalty_percent > 0 and penalty_percent < 1:
+        legal_score += 10
+        reasons.append("Penalty clause present but very weak (under 1%)")
 
     if not ld:
         legal_score += 15
@@ -132,7 +138,26 @@ def calculate_risk(contract_data: dict):
         vendor_score += 10
         reasons.append("Vendor certification requirements unclear")
 
+    # -------------------------
+    # FIX 3 — contract value context on commercial score
+    # -------------------------
+
+    try:
+        # extract numeric value from strings like "45,00,000" or "4500000"
+        value_str = str(contract_value).replace(",", "").strip()
+        numeric_value = float(''.join(c for c in value_str if c.isdigit() or c == '.'))
+    except (ValueError, TypeError):
+        numeric_value = 0
+
+    # high value contract with no advance = bigger commercial risk
+    if numeric_value >= 5000000 and not advance:
+        commercial_score += 10
+        reasons.append("High value contract with no advance payment — increased commercial exposure")
+
+    # -------------------------
     # Cap individual scores
+    # -------------------------
+
     commercial_score = min(commercial_score, 100)
     operational_score = min(operational_score, 100)
     legal_score = min(legal_score, 100)

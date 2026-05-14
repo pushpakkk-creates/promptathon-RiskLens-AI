@@ -17,5 +17,5 @@ def extract_pages_from_pdf(pdf_bytes):
             "page": index + 1,
             "text": page.get_text()
         })
-
+    doc.close()
     return pages
