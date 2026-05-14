@@ -8,6 +8,9 @@ def detect_missing_clauses(contract_data: dict):
     if not contract_data.get("contract_value"):
         missing.append("Contract value clause")
 
+    if contract_data.get("payment_cycle_days", 0) == 0:
+        missing.append("Payment cycle clause")
+
     # Operational
     if contract_data.get("delivery_timeline_days", 0) == 0:
         missing.append("Delivery timeline clause")
