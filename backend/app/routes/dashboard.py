@@ -35,6 +35,7 @@ def serialize_contract(contract: Contract):
     kpis = data.get("procurement_kpis") or {}
     citations = kpis.get("clause_citations")
 
+    # FIX 3 — only rebuild if truly missing, not on every request
     if not citations:
         pages = load_pages_from_upload(contract.filename)
 
@@ -108,6 +109,9 @@ def list_contracts(
     risk_band: str | None = Query(default=None),
     document_type: str | None = Query(default=None),
     workflow_status: str | None = Query(default=None),
+    # FIX 4 — pagination
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     query = apply_contract_filters(
@@ -117,9 +121,17 @@ def list_contracts(
         workflow_status
     )
 
-    return query.order_by(
+    total = query.count()
+    contracts = query.order_by(
         Contract.created_at.desc()
-    ).all()
+    ).offset((page - 1) * page_size).limit(page_size).all()
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "contracts": contracts
+    }
 
 
 @router.get("/contracts/{contract_id}")
@@ -148,38 +160,33 @@ def analyst_dashboard(
     workflow_status: str | None = Query(default=None),
     db: Session = Depends(get_db)
 ):
-    query = apply_contract_filters(
+    # FIX 1 — filter by email in SQL not Python
+    all_query = apply_contract_filters(
         db.query(Contract),
         risk_band,
         document_type,
         workflow_status
     )
 
-    contracts = query.order_by(
-        Contract.created_at.desc()
-    ).all()
+    my_contracts = all_query.filter(
+        Contract.submitted_by == email
+    ).order_by(Contract.created_at.desc()).all()
 
-    my_contracts = [
-        c for c in contracts
-        if c.submitted_by == email
-    ]
+    portfolio_total = all_query.count()
 
     return {
         "total_uploaded": len(my_contracts),
-        "portfolio_total": len(contracts),
-        "pending_review": len([
-            c for c in contracts
-            if c.workflow_status == "PENDING_MANAGER_REVIEW"
-        ]),
-        "approved": len([
-            c for c in contracts
-            if c.workflow_status == "APPROVED"
-        ]),
-        "escalated": len([
-            c for c in contracts
-            if c.workflow_status == "ESCALATED"
-        ]),
-        "contracts": contracts,
+        "portfolio_total": portfolio_total,
+        "pending_review": db.query(Contract).filter(
+            Contract.workflow_status == "PENDING_MANAGER_REVIEW"
+        ).count(),
+        "approved": db.query(Contract).filter(
+            Contract.workflow_status == "APPROVED"
+        ).count(),
+        "escalated": db.query(Contract).filter(
+            Contract.workflow_status == "ESCALATED"
+        ).count(),
+        "contracts": my_contracts,
         "data_source": "supabase"
     }
 
@@ -191,45 +198,36 @@ def manager_dashboard(
     workflow_status: str | None = Query(default=None),
     db: Session = Depends(get_db)
 ):
-    queue_statuses = [
-        "PENDING_MANAGER_REVIEW",
-        "ESCALATED"
-    ]
+    queue_statuses = ["PENDING_MANAGER_REVIEW", "ESCALATED"]
 
-    query = db.query(Contract).filter(
-        Contract.workflow_status.in_(queue_statuses)
-    )
-
-    query = apply_contract_filters(
-        query,
+    # FIX 2 — single query with status counts, not two full table scans
+    all_contracts = apply_contract_filters(
+        db.query(Contract),
         risk_band,
         document_type,
         workflow_status
-    )
+    ).order_by(Contract.created_at.desc()).all()
 
-    contracts = query.order_by(
-        Contract.created_at.desc()
-    ).all()
-
-    all_contracts = db.query(Contract).order_by(
-        Contract.created_at.desc()
-    ).all()
+    approval_queue = [
+        c for c in all_contracts
+        if c.workflow_status in queue_statuses
+    ]
 
     return {
-        "pending_count": len(contracts),
-        "approval_queue": contracts,
-        "total_reviewed": len([
-            c for c in all_contracts
+        "pending_count": len(approval_queue),
+        "approval_queue": approval_queue,
+        "total_reviewed": sum(
+            1 for c in all_contracts
             if c.workflow_status in ["APPROVED", "REJECTED", "SENT_BACK"]
-        ]),
-        "approved": len([
-            c for c in all_contracts
+        ),
+        "approved": sum(
+            1 for c in all_contracts
             if c.workflow_status == "APPROVED"
-        ]),
-        "rejected": len([
-            c for c in all_contracts
+        ),
+        "rejected": sum(
+            1 for c in all_contracts
             if c.workflow_status == "REJECTED"
-        ]),
+        ),
         "all_contracts": all_contracts,
         "data_source": "supabase"
     }
