@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   FileSearch,
   Gauge,
+  Info,
   MessageSquare,
   RotateCcw,
   Send,
@@ -491,19 +492,33 @@ export default function ContractPage() {
 
       {/* ── DOCUMENT KPIs TAB ── */}
       {active === "document" ? (
-        <Panel icon={<FileSearch size={20} />} title="Extracted Contract Details">
+        <Panel
+          icon={<FileSearch size={20} />}
+          title="Extracted Contract Details"
+          action={
+            <a
+              href="https://claude.ai/public/artifacts/88dd18c2-6ba3-4fb6-97fd-78003b08a450"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="View KPI reference guide"
+              className="grid h-8 w-8 place-items-center rounded-full border border-blue-200 bg-blue-50 text-[var(--carrier-blue)] transition hover:bg-[var(--carrier-blue)] hover:text-white hover:border-[var(--carrier-blue)]"
+            >
+              <Info size={16} />
+            </a>
+          }
+        >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Info label="Scope" value={kpis.scope_summary || "Not specified"} />
-            <Info label="Payment terms" value={kpis.payment_terms || "Not specified"} />
-            <Info label="Payment cycle" value={`${kpis.payment_cycle_days || 0} days`} />
-            <Info label="Delivery timeline" value={`${kpis.delivery_timeline_days || 0} days`} />
-            <Info label="SLA response" value={`${kpis.sla_response_time_hours || 0} hours`} />
-            <Info label="Uptime SLA" value={`${kpis.sla_uptime_percent || 0}%`} />
-            <Info label="Maintenance" value={kpis.maintenance_frequency || "Not specified"} />
-            <Info label="Warranty" value={`${kpis.warranty_months || 0} months`} />
-            <Info label="Vendor turnover" value={kpis.minimum_turnover_required || "Not specified"} />
-            <Info label="Experience" value={`${kpis.minimum_experience_years || 0} years`} />
-            <Info label="Certifications" value={kpis.certifications_required || "Not specified"} />
+            <InfoCard label="Scope" value={kpis.scope_summary || "Not specified"} />
+            <InfoCard label="Payment terms" value={kpis.payment_terms || "Not specified"} />
+            <InfoCard label="Payment cycle" value={`${kpis.payment_cycle_days || 0} days`} />
+            <InfoCard label="Delivery timeline" value={`${kpis.delivery_timeline_days || 0} days`} />
+            <InfoCard label="SLA response" value={`${kpis.sla_response_time_hours || 0} hours`} />
+            <InfoCard label="Uptime SLA" value={`${kpis.sla_uptime_percent || 0}%`} />
+            <InfoCard label="Maintenance" value={kpis.maintenance_frequency || "Not specified"} />
+            <InfoCard label="Warranty" value={`${kpis.warranty_months || 0} months`} />
+            <InfoCard label="Vendor turnover" value={kpis.minimum_turnover_required || "Not specified"} />
+            <InfoCard label="Experience" value={`${kpis.minimum_experience_years || 0} years`} />
+            <InfoCard label="Certifications" value={kpis.certifications_required || "Not specified"} />
           </div>
         </Panel>
       ) : null}
@@ -525,12 +540,18 @@ export default function ContractPage() {
 
 // ─── Shared components ────────────────────────────────────────────────────────
 
-function Panel({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function Panel({ title, icon, children, action }: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
   return (
     <section className="mt-6 rounded-lg border border-blue-100 bg-white p-5 shadow-sm">
       <div className="mb-5 flex items-center gap-3">
         <span className="grid h-10 w-10 place-items-center rounded-lg bg-blue-50 text-[var(--carrier-blue)]">{icon}</span>
         <h2 className="text-xl font-black text-[var(--ink-blue)]">{title}</h2>
+        {action && <div className="ml-auto">{action}</div>}
       </div>
       {children}
     </section>
@@ -613,7 +634,7 @@ function InsightList({ title, items, empty, danger }: { title: string; items: st
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function InfoCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-blue-100 bg-white p-4">
       <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
